@@ -1,0 +1,3011 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>单据排版工具 v18</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #e8eaed;
+    --border: #d1d5db;
+    --accent: #00a87a;
+    --accent-dim: rgba(0,168,122,0.1);
+    --blue: #2563eb;
+    --blue-dim: rgba(37,99,235,0.1);
+    --warn: #dc6027;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --purple: #7c3aed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; padding: 20px 14px 80px; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,0,0,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,0,0,0.03) 1px,transparent 1px);
+    background-size: 48px 48px; pointer-events: none; z-index: 0;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; position: relative; z-index: 1; }
+
+  .header { margin-bottom: 20px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: .15em; text-transform: uppercase; border: 1px solid rgba(0,168,122,.35); padding: 3px 10px; margin-bottom: 10px; background: var(--accent-dim); }
+  .badge::before { content: '◆'; font-size: 7px; }
+  h1 { font-family: var(--mono); font-size: clamp(18px,3.5vw,28px); font-weight: 600; letter-spacing: -.02em; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .desc { margin-top: 6px; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { font-family: var(--mono); font-size: 11px; padding: 7px 16px; border: 1px solid var(--border); background: transparent; cursor: pointer; letter-spacing: .06em; text-transform: uppercase; transition: all .15s; color: var(--muted); }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* Panel */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* API key section */
+  .api-section { background: var(--surface); border: 1px solid var(--border); padding: 12px 16px; margin-bottom: 12px; }
+  .api-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .api-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .api-input { flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 12px; padding: 6px 10px; outline: none; }
+  .api-input:focus { border-color: var(--blue); }
+
+  /* Section */
+  .section { background: var(--surface); border: 1px solid var(--border); padding: 14px 16px; margin-bottom: 12px; }
+  .sec-label { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .sec-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 12px; line-height: 1.65; padding: 10px 12px; resize: vertical; outline: none; min-height: 120px; transition: border-color .2s; }
+  textarea:focus { border-color: var(--blue); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* Upload area */
+  .upload-area { border: 2px dashed var(--border); padding: 20px; text-align: center; cursor: pointer; transition: border-color .2s; margin-bottom: 10px; }
+  .upload-area:hover { border-color: var(--accent); }
+  .upload-area.has-image { border-color: var(--accent); border-style: solid; }
+  .upload-area input { display: none; }
+  .upload-label { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .upload-preview { max-width: 100%; max-height: 200px; display: none; margin: 10px auto 0; }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; border: none; transition: opacity .15s, transform .1s; white-space: nowrap; }
+  .btn:active { transform: scale(.97); }
+  .btn-go { background: var(--accent); color: #fff; }
+  .btn-go:hover { opacity: .88; }
+  .btn-go:disabled { opacity: .4; cursor: not-allowed; }
+  .hbtn { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 6px 12px; cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap; }
+  .hbtn:hover { color: var(--accent); border-color: var(--accent); }
+  .hbtn.blue:hover { color: var(--blue); border-color: var(--blue); }
+
+  /* Output */
+  .output-wrap { position: relative; }
+  .output { background: #1e1e2e; color: #cdd6f4; font-family: var(--mono); font-size: 13px; line-height: 1.7; padding: 14px 16px; min-height: 100px; white-space: pre-wrap; word-break: break-all; border: 1px solid var(--border); }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: transparent; border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.6); font-family: var(--mono); font-size: 10px; padding: 4px 10px; cursor: pointer; letter-spacing: .06em; text-transform: uppercase; transition: all .15s; }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Spinner */
+  .spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 22px; right: 18px; background: var(--text); border: 1px solid var(--border); padding: 9px 16px; font-family: var(--mono); font-size: 12px; color: #fff; z-index: 999; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; max-width: 260px; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Loading overlay */
+  .loading-msg { font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 8px 0; display: none; }
+
+  /* ABC format special */
+  .abc-note { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+
+  /* Print styles for thermal printer */
+  @media print {
+    body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+    body::before { display: none !important; }
+    .wrap > *:not(#printTarget) { display: none !important; }
+    #printTarget {
+      display: block !important;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #000;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-width: 58mm;
+      margin: 0;
+      padding: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div class="badge">单据排版系统</div>
+  <h1>单据 <em>排版工具</em></h1>
+  <p class="desc">多格式单据转换 · 本地处理 · 无需登录 · v18 · 支持42model本地OCR</p>
+</div>
+
+<!-- API Key (only shown for Format 1) -->
+<div class="api-section" id="apiSection">
+  <!-- Engine selector -->
+  <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+    <button id="engine42model" class="hbtn" onclick="selectEngine('42model')"
+      style="color:#00a87a;border-color:#00a87a;background:#e6f7f3">🖥 42model 本地</button>
+    <button id="engineClaude" class="hbtn" onclick="selectEngine('claude')">Claude Haiku</button>
+    <button id="engineGemini" class="hbtn" onclick="selectEngine('gemini')">Gemini</button>
+    <button class="hbtn" onclick="saveDefaultEngine()" style="border-color:var(--warn);color:var(--warn)">⭐ 设为此设备默认</button>
+  </div>
+  <div id="defaultEngineLabel" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px"></div>
+  <!-- 42model local row -->
+  <div class="api-row" id="42modelRow" style="display:none">
+    <span class="api-label" style="color:#00a87a">✓ 本地运行 · 免费 · 无需 API Key</span>
+    <button class="hbtn" onclick="test42modelAPI()" style="color:#00a87a;border-color:#00a87a">测试连接</button>
+  </div>
+  <!-- Claude key row -->
+  <div class="api-row" id="claudeRow" style="display:none">
+    <span class="api-label">Claude API Key</span>
+    <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-..." oninput="saveApiKey()" />
+    <button class="hbtn" onclick="testAPI()">测试</button>
+    <button class="hbtn" onclick="toggleApiVis('apiKey', this)">显示</button>
+  </div>
+  <!-- Gemini key row -->
+  <div class="api-row" id="geminiRow" style="display:none">
+    <span class="api-label">Gemini API Key</span>
+    <input class="api-input" type="password" id="geminiKey" placeholder="AIza..." oninput="saveGeminiKey()" />
+    <button class="hbtn" onclick="testGeminiAPI()">测试</button>
+    <button class="hbtn" onclick="toggleApiVis('geminiKey', this)">显示</button>
+  </div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px">API Key 已自动保存到本机，下次无需重新输入</div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab(0)">① 文字提取</button>
+  <button class="tab" onclick="switchTab(1)">② 排版助手</button>
+  <button class="tab" onclick="switchTab(2)">③ 查理斯</button>
+  <button class="tab" onclick="switchTab(3)">④ ABC</button>
+  <button class="tab" onclick="switchTab(4)">⑤ 沙拉吉她</button>
+  <button class="tab" onclick="switchTab(5)">⑥ l3n3</button>
+  <button class="tab" onclick="switchTab(6)">⑦ XF</button>
+  <button class="tab" onclick="switchTab(7)">⑧ 中奖</button>
+</div>
+
+<!-- ══ Panel 0: 文字提取 (OCR) ══ -->
+<div class="panel active" id="panel0">
+  <div class="section">
+    <div class="sec-label">上传单据图片</div>
+    <div class="btn-row" style="margin-bottom:10px">
+      <button class="btn btn-go" style="background:var(--blue)" onclick="document.getElementById('imgCamera').click()">📷 拍照</button>
+      <button class="hbtn" onclick="document.getElementById('imgInput').click()">🖼 从相册选择</button>
+      <button class="hbtn blue" onclick="pasteImage()">📋 粘贴图片</button>
+    </div>
+    <input type="file" id="imgCamera" accept="image/*" capture="environment" onchange="onImageSelected(event)" style="display:none">
+    <input type="file" id="imgInput" accept="image/*" onchange="onImageSelected(event)" style="display:none">
+    <div class="upload-area" id="uploadArea" style="cursor:default">
+      <div class="upload-label" id="uploadLabel">尚未选择图片</div>
+      <img id="uploadPreview" class="upload-preview" alt="预览">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-go" onclick="runOCR()" id="ocrBtn">
+        <span class="spinner" id="ocrSpinner"></span>
+        ▶ 开始识别
+      </button>
+      <button class="hbtn" onclick="clearPanel0()">✕ 清空</button>
+    </div>
+    <div class="loading-msg" id="ocrLoading">正在识别中，请稍候...</div>
+  </div>
+  <div class="section">
+    <div class="sec-label">识别结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output0">—</div>
+      <button class="copy-btn" onclick="copyOutput(0)">复制</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Panel 1: 排版助手 ══ -->
+<div class="panel" id="panel1">
+  <div class="section">
+    <div class="sec-label">输入文本</div>
+    <textarea id="input1" placeholder="粘贴文本，例如：9891,9198,2256,1421...rm3A2 或 8177-1 7718-1 5397-1...mkt"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="runFormat1()">▶ 转换</button>
+      <button class="hbtn" onclick="document.getElementById('input1').value=''">✕ 清空</button>
+      <button class="hbtn blue" onclick="pasteTo('input1')">📋 粘贴</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output1">—</div>
+      <button class="copy-btn" onclick="copyOutput(1)">复制</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Panel 2: 查理斯 ══ -->
+<div class="panel" id="panel2">
+  <div class="section">
+    <div class="sec-label">输入文本</div>
+    <textarea id="input2" placeholder="粘贴 Charles 的 WhatsApp 消息..." style="min-height:160px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="runFormat2()">▶ 转换</button>
+      <button class="hbtn" onclick="document.getElementById('input2').value=''">✕ 清空</button>
+      <button class="hbtn blue" onclick="pasteTo('input2')">📋 粘贴</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output2">—</div>
+      <button class="copy-btn" onclick="copyOutput(2)">复制</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Panel 3: ABC ══ -->
+<div class="panel" id="panel3">
+  <div class="section">
+    <div class="sec-label">输入文本</div>
+    <textarea id="input3" placeholder="粘贴单据内容，例如：9466=2B 3S..." style="min-height:160px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="runFormat3()">▶ 转换</button>
+      <button class="hbtn" onclick="document.getElementById('input3').value=''">✕ 清空</button>
+      <button class="hbtn blue" onclick="pasteTo('input3')">📋 粘贴</button>
+    </div>
+    <div class="abc-note">B → D1+E1 (÷2)　　S → A1+B1+C1 (÷3)　　混合 → 按 A1→B1→C1→D1→E1</div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output3">—</div>
+      <button class="copy-btn" onclick="copyOutput(3)">复制</button>
+    </div>
+    <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="shareOutput('output3')"
+        style="background:#25D366;color:#fff;font-size:11px;padding:8px 18px">📱 WhatsApp</button>
+      <button class="btn" onclick="printOutput('output3')"
+        style="background:var(--purple);color:#fff;font-size:11px;padding:8px 18px">🖨 打印</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Panel 4: 沙拉 ══ -->
+<div class="panel" id="panel4">
+  <div class="section">
+    <div class="sec-label">输入文本</div>
+    <textarea id="input4" placeholder="粘贴单据内容，包含 *MPTSHE 等公司代码行和投注行..." style="min-height:160px"></textarea>
+    <div class="btn-row" style="margin-top:10px;justify-content:space-between;align-items:center">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-go" onclick="runFormat4()">▶ 转换</button>
+        <button class="hbtn" onclick="document.getElementById('input4').value=''">✕ 清空</button>
+        <button class="hbtn blue" onclick="pasteTo('input4')">📋 粘贴</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:16px">
+        <button id="tomorrowBtn" class="hbtn" onclick="toggleTomorrow()"
+          style="border-color:var(--warn);color:var(--muted);white-space:nowrap">
+          📅 明日模式: 关
+        </button>
+        <button id="yqBtn" class="hbtn" onclick="toggleYQ()"
+          style="border:1.5px solid var(--blue);color:var(--blue);font-weight:600;white-space:nowrap">YQ</button>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div id="output4container"><div class="output">—</div></div>
+  </div>
+</div>
+
+<!-- ══ Panel 5: l3n3 ══ -->
+<div class="panel" id="panel5">
+  <div class="section">
+    <div class="sec-label">输入文本</div>
+    <textarea id="input5" placeholder="粘贴单据内容，例如 *E、*H、*EH 等标记行..." style="min-height:160px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="runFormat5()">▶ 转换</button>
+      <button class="hbtn" onclick="document.getElementById('input5').value=''">✕ 清空</button>
+      <button class="hbtn blue" onclick="pasteTo('input5')">📋 粘贴</button>
+      <button id="lnModeBtn" class="hbtn" onclick="toggleLNMode()"
+        style="border:1.5px solid #e53e3e;color:#e53e3e;font-weight:600">LN</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output5">—</div>
+      <button class="copy-btn" onclick="copyOutput(5)">复制</button>
+    </div>
+    <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="shareOutput('output5')"
+        style="background:#25D366;color:#fff;font-size:11px;padding:8px 18px">📱 WhatsApp</button>
+      <button class="btn" onclick="printOutput('output5')"
+        style="background:var(--purple);color:#fff;font-size:11px;padding:8px 18px">🖨 打印</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Panel 6: XF ══ -->
+<div class="panel" id="panel6">
+  <div class="section">
+    <div class="sec-label">输入报表文本</div>
+    <textarea id="input6" placeholder="粘贴整个报表内容（包含 MYR 和 SGD 部分）..." style="min-height:240px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="runFormat6()">▶ 生成对比</button>
+      <button class="hbtn" onclick="document.getElementById('input6').value=''">✕ 清空</button>
+      <button class="hbtn blue" onclick="pasteTo('input6')">📋 粘贴</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">输出结果</div>
+    <div id="output6Container" style="display:none;margin-bottom:12px">
+      <div id="output6Preview" style="background:#fffacd;border:1px solid var(--border);padding:20px;border-radius:4px;font-family:var(--mono);font-size:14px">
+        <div style="margin-bottom:20px">
+          <div style="font-weight:700;margin-bottom:16px;font-size:14px;color:#1a1a1a">从<span id="xfDateDisplay">—</span>的账目</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:20px">
+          <!-- MYR 列 -->
+          <div style="flex:1">
+            <div style="font-weight:700;margin-bottom:12px;font-size:16px;color:#2563eb;text-align:right">RM</div>
+            <div id="xfTableRM" style="line-height:2;text-align:right"></div>
+          </div>
+          <!-- SGD 列 -->
+          <div style="flex:1">
+            <div style="font-weight:700;margin-bottom:12px;font-size:16px;color:#059669;text-align:right">SGD</div>
+            <div id="xfTableSGD" style="line-height:2;text-align:right"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:12px">
+          <div style="flex:1">
+            <div style="border-bottom:2px solid #000;padding-bottom:8px;text-align:right;width:60%"></div>
+          </div>
+          <div style="flex:1">
+            <div style="border-bottom:2px solid #000;padding-bottom:8px;text-align:right;width:60%"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:40px;background:#fffacd;padding:12px;margin:0 -12px -12px;border-radius:0 0 4px 4px">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:15px;text-align:right;color:#000"><span id="rmTotal">—</span></div>
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:15px;text-align:right;color:#000"><span id="sgdTotal">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-go" onclick="copyXFImage()" style="background:var(--accent)">📋 复制图片</button>
+        <button class="btn btn-go" onclick="downloadXFImage()" style="background:#25d366">📤 发送图片</button>
+        <button class="btn btn-go" onclick="shareXFWhatsApp()" style="background:#007bff">💬 分享文本</button>
+      </div>
+    </div>
+    <div id="output6Message" style="text-align:center;color:var(--muted);padding:20px">—</div>
+  </div>
+</div>
+
+<!-- ══ Panel 7: 中奖 ══ -->
+<div class="panel" id="panel7">
+  <div class="section">
+    <div class="sec-label">号码库管理</div>
+    <textarea id="input7LotteryRaw" placeholder="粘贴开彩号码（复制自网站或来源）..." style="min-height:120px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="pasteTo('input7LotteryRaw')" style="background:var(--blue)">📋 粘贴</button>
+      <button class="btn btn-go" onclick="autoFetchLottery()" style="background:#f59e0b" id="autoFetchBtn">🔄 自动抓取</button>
+      <button class="btn btn-go" onclick="addLotteryToLib()" style="background:var(--accent)">➕ 添加到库</button>
+      <button class="hbtn" onclick="document.getElementById('input7LotteryRaw').value=''">✕ 清空</button>
+      <button class="hbtn" onclick="toggleLotteryHistory()" style="border-color:#9333ea;color:#9333ea">🔍 历史号码</button>
+      <button class="hbtn" onclick="exportLotteryData()" style="border-color:#2563eb;color:#2563eb">⬇ 导出</button>
+      <label class="hbtn" style="border-color:#2563eb;color:#2563eb;cursor:pointer">⬆ 导入<input type="file" accept=".json" style="display:none" onchange="importLotteryData(this)"></label>
+    </div>
+    <div id="lotteryLibStatus" style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:4px;font-size:11px;color:var(--muted)">号码库状态：空</div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">检查中奖</div>
+    <textarea id="input7Ticket" placeholder="粘贴票根号码..." style="min-height:120px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-go" onclick="pasteTo('input7Ticket')" style="background:var(--blue)">📋 粘贴</button>
+      <button class="btn btn-go" onclick="checkWinning()" style="background:var(--accent)">🎯 检查中奖</button>
+      <button class="hbtn" onclick="document.getElementById('input7Ticket').value=''">✕ 清空</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">检查结果</div>
+    <div class="output-wrap">
+      <div class="output" id="output7">—</div>
+      <button class="copy-btn" onclick="copyOutput(7)">复制</button>
+    </div>
+  </div>
+
+  <!-- 卡片生成区域 -->
+  <div class="section" id="cardSection" style="display:none">
+    <div class="sec-label">分享卡片</div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-go" onclick="generateCard()" style="background:var(--accent)">🖼 生成卡片</button>
+      <button class="btn btn-go" id="shareWaBtn" onclick="shareCardToWhatsApp()" style="background:#25D366;display:none">📱 WhatsApp 分享</button>
+      <button class="btn btn-go" id="downloadBtn" onclick="downloadCard()" style="background:var(--blue);display:none">⬇ 下载图片</button>
+    </div>
+    <!-- 卡片预览 -->
+    <div id="cardPreview" style="display:none;margin-bottom:12px">
+      <img id="cardImage" style="max-width:100%;border:1px solid var(--border)" />
+    </div>
+    <!-- 卡片模板（用于生成图片，平时隐藏在屏幕外） -->
+    <div id="cardTemplate" style="position:fixed;left:-9999px;top:0;background:#fff;padding:24px;font-family:'IBM Plex Mono',monospace;min-width:600px">
+    </div>
+  </div>
+
+  <!-- 隐藏的历史号码菜单 -->
+  <div id="lotteryHistoryModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow:auto">
+    <div style="background:#fff;margin:20px auto;max-width:800px;padding:20px;border-radius:8px;max-height:85vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;font-size:16px">历史开彩号码库 - 日历管理</h3>
+        <button class="hbtn" onclick="toggleLotteryHistory()" style="padding:4px 8px">✕ 关闭</button>
+      </div>
+
+      <!-- 日历视图 -->
+      <div id="lotteryCalendarView" style="margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:6px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px" id="lotteryDateGrid">
+          暂无号码
+        </div>
+      </div>
+
+      <!-- 详细信息视图 -->
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <h4 style="margin:0 0 12px 0;font-size:12px;color:var(--muted);text-transform:uppercase">详细内容</h4>
+        <div id="lotteryHistoryContent" style="font-family:var(--mono);font-size:11px;line-height:1.6;max-height:40vh;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px">
+          暂无号码
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end wrap -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════
+// TABS
+// ════════════════════════════════
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', i===j));
+  document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', i===j));
+  document.getElementById('apiSection').style.display = i===0 ? 'block' : 'none';
+}
+
+// ════════════════════════════════
+// API KEY
+// ════════════════════════════════
+let currentEngine = '42model';
+
+function selectEngine(engine) {
+  currentEngine = engine;
+  document.getElementById('42modelRow').style.display = engine === '42model' ? 'flex' : 'none';
+  document.getElementById('claudeRow').style.display  = engine === 'claude'  ? 'flex' : 'none';
+  document.getElementById('geminiRow').style.display  = engine === 'gemini'  ? 'flex' : 'none';
+  const lBtn = document.getElementById('engine42model');
+  const cBtn = document.getElementById('engineClaude');
+  const gBtn = document.getElementById('engineGemini');
+  lBtn.style.cssText = '';
+  cBtn.style.cssText = '';
+  gBtn.style.cssText = '';
+  if (engine === '42model') lBtn.style.cssText = 'color:#00a87a;border-color:#00a87a;background:#e6f7f3;font-weight:bold';
+  if (engine === 'claude')  cBtn.style.cssText = 'color:var(--accent);border-color:var(--accent);background:var(--accent-dim)';
+  if (engine === 'gemini')  gBtn.style.cssText = 'color:var(--blue);border-color:var(--blue);background:var(--blue-dim)';
+}
+
+function getKey() { return document.getElementById('apiKey').value.trim(); }
+function getGeminiKey() { return document.getElementById('geminiKey').value.trim(); }
+
+function saveApiKey() {
+  const key = getKey();
+  if (key) localStorage.setItem('claude_api_key', key);
+}
+function saveGeminiKey() {
+  const key = getGeminiKey();
+  if (key) localStorage.setItem('gemini_api_key', key);
+}
+
+function loadApiKey() {
+  const saved = localStorage.getItem('claude_api_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+  const gm = localStorage.getItem('gemini_api_key');
+  if (gm) document.getElementById('geminiKey').value = gm;
+  // 旧版本可能存过已移除的引擎（如 doubao），不认识的一律回退 42model
+  const defSaved = localStorage.getItem('defaultEngine');
+  const def = ['42model', 'claude', 'gemini'].includes(defSaved) ? defSaved : '42model';
+  selectEngine(def);
+  updateDefaultLabel();
+}
+
+function engineName(e) {
+  return { '42model': '42model 本地', 'claude': 'Claude Haiku', 'gemini': 'Gemini' }[e] || e;
+}
+
+function saveDefaultEngine() {
+  localStorage.setItem('defaultEngine', currentEngine);
+  updateDefaultLabel();
+  showToast('✓ 已设为此设备默认：' + engineName(currentEngine));
+}
+
+function updateDefaultLabel() {
+  const saved = localStorage.getItem('defaultEngine');
+  const el = document.getElementById('defaultEngineLabel');
+  if (el) el.textContent = saved ? '此设备默认：' + engineName(saved) : '';
+}
+
+function toggleApiVis(id, btn) {
+  const el = document.getElementById(id);
+  if (el.type === 'password') { el.type = 'text'; btn.textContent = '隐藏'; }
+  else { el.type = 'password'; btn.textContent = '显示'; }
+}
+
+async function testAPI() {
+  const key = getKey();
+  if (!key) { showToast('请先输入 Claude API Key'); return; }
+  showToast('测试中...');
+  try {
+    await callClaude(key, 'Say "OK" only.', null);
+    showToast('Claude API Key 有效 ✓');
+  } catch(e) {
+    showToast('无效: ' + e.message);
+  }
+}
+
+async function testGeminiAPI() {
+  const key = getGeminiKey();
+  if (!key) { showToast('请先输入 Gemini API Key'); return; }
+  showToast('检测可用模型中...');
+  try {
+    const model = await getGeminiModel(key);
+    showToast('Gemini 有效 ✓ 模型: ' + model);
+  } catch(e) {
+    showToast('无效: ' + e.message);
+  }
+}
+
+// ════════════════════════════════
+// CLAUDE API CALL
+// ════════════════════════════════
+async function callClaude(key, prompt, imageBase64) {
+  const content = [];
+  if (imageBase64) {
+    content.push({ type: 'image', source: { type: 'base64', media_type: imageBase64.type, data: imageBase64.data } });
+  }
+  content.push({ type: 'text', text: prompt });
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.error?.message || res.statusText);
+  }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+// ════════════════════════════════
+// GEMINI API CALL
+// ════════════════════════════════
+// Auto-detect first available Gemini vision model for this API key
+async function getGeminiModel(key) {
+  const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+  const res = await fetch(listUrl);
+  if (!res.ok) throw new Error('无法获取模型列表，请检查 API Key 是否正确');
+  const data = await res.json();
+  const models = (data.models || []).map(m => m.name.replace('models/', ''));
+  // Prefer flash models that support generateContent
+  const preferred = ['gemini-2.5-flash','gemini-1.5-flash','gemini-2.0-flash-lite','gemini-1.5-pro','gemini-2.0-pro'];
+  for (const p of preferred) {
+    if (models.some(m => m.startsWith(p))) return models.find(m => m.startsWith(p));
+  }
+  // Fallback: first model with 'flash' or 'pro' in name
+  const fallback = models.find(m => m.includes('flash') || (m.includes('pro') && !m.includes('vision')));
+  if (fallback) return fallback;
+  throw new Error('找不到可用的 Gemini 模型。可用模型：' + models.slice(0,5).join(', '));
+}
+
+async function callGemini(key, prompt, imageBase64) {
+  const model = await getGeminiModel(key);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+
+  const parts = [];
+  if (imageBase64) {
+    parts.push({ inline_data: { mime_type: imageBase64.type, data: imageBase64.data } });
+  }
+  parts.push({ text: prompt });
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }] })
+    });
+  } catch(netErr) {
+    throw new Error('网络错误：无法连接 Gemini API，请检查网络。');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.error?.message || res.statusText);
+  }
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
+}
+
+// ════════════════════════════════
+// FORMAT 0 — OCR 文字提取
+// ════════════════════════════════
+let selectedImage = null;
+
+function onImageSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  // Reset other input so same file can be selected again
+  document.getElementById('imgInput').value = '';
+  document.getElementById('imgCamera').value = '';
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataURL = ev.target.result;
+    // Compress image to stay under 4MB base64
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      // Scale down if too large
+      const MAX = 1800;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // Try quality 0.85 first, reduce if still too big
+      let quality = 0.85;
+      let compressedURL = canvas.toDataURL('image/jpeg', quality);
+      while (compressedURL.length > 5000000 && quality > 0.3) {
+        quality -= 0.1;
+        compressedURL = canvas.toDataURL('image/jpeg', quality);
+      }
+      const base64 = compressedURL.split(',')[1];
+      selectedImage = { data: base64, type: 'image/jpeg' };
+      document.getElementById('uploadPreview').src = compressedURL;
+      document.getElementById('uploadPreview').style.display = 'block';
+      document.getElementById('uploadLabel').textContent = '✓ ' + file.name;
+      document.getElementById('uploadArea').classList.add('has-image');
+    };
+    img.src = dataURL;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function test42modelAPI() {
+  try {
+    const res = await fetch('http://localhost:11520/v1/models', {
+      headers: { 'Authorization': 'Bearer 42model' }
+    });
+    if (res.ok) {
+      showToast('✓ 42model 连接成功！');
+    } else {
+      showToast('❌ 连接失败，请确认 42model 引擎正在运行');
+    }
+  } catch(e) {
+    showToast('❌ 无法连接，请打开 42model 并启动引擎');
+  }
+}
+
+async function call42model(prompt, imageBase64) {
+  const messages = [{
+    role: 'user',
+    content: imageBase64
+      ? [
+          { type: 'image_url', image_url: { url: `data:${imageBase64.type};base64,${imageBase64.data}` } },
+          { type: 'text', text: prompt }
+        ]
+      : [{ type: 'text', text: prompt }]
+  }];
+
+  let res;
+  try {
+    res = await fetch('http://localhost:11520/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer 42model'
+      },
+      body: JSON.stringify({
+        model: 'glm-ocr:1b',
+        messages,
+        max_tokens: 2048
+      })
+    });
+  } catch(netErr) {
+    throw new Error('无法连接 42model，请确认引擎正在运行（活水模型 → 引擎 → 让活水奔流）');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.error?.message || '42model 返回错误: ' + res.status);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+async function runOCR() {
+  if (!selectedImage) { showToast('请先上传图片'); return; }
+
+  if (currentEngine !== '42model') {
+    const key = currentEngine === 'gemini' ? getGeminiKey() : getKey();
+    const engineLabel = currentEngine === 'gemini' ? 'Gemini' : 'Claude';
+    if (!key) { showToast(`请先输入 ${engineLabel} API Key`); return; }
+  }
+
+  const btn = document.getElementById('ocrBtn');
+  const spinner = document.getElementById('ocrSpinner');
+  const loading = document.getElementById('ocrLoading');
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  loading.style.display = 'block';
+  document.getElementById('output0').textContent = '识别中...';
+
+  const prompt = `You are an OCR extraction engine for lottery ticket images.
+
+STRICT RULES:
+1. Extract ALL text exactly as shown. Do NOT explain, analyze, or add any extra words.
+2. Each lottery number is exactly 4 digits. Read each digit carefully one by one.
+3. Common handwriting confusion to watch for:
+   - 0 (zero) vs 6: zero is fully closed circle, 6 has a tail at top
+   - 1 vs 7: 1 is straight, 7 has a horizontal bar at top
+   - 3 vs 8: 3 is open on left, 8 is fully closed
+   - 2 vs 7: different top shape
+   - 9 vs 4: 9 has closed loop, 4 has open angle
+4. Replace「·」or「-」(digit separators) with「#」
+5. If a line contains BOX or bbox or b box → add * prefix to that line
+6. Output each number on its own line. No numbering, no labels, no extra text.
+7. If multiple columns exist, output each column separated by a blank line.
+8. Do NOT suggest anything after finishing.
+
+ONLY output the final extracted text.`;
+
+  try {
+    const key = currentEngine === 'gemini' ? getGeminiKey() : getKey();
+    const result = currentEngine === '42model' ? await call42model(prompt, selectedImage)
+                 : currentEngine === 'gemini'  ? await callGemini(key, prompt, selectedImage)
+                 : await callClaude(key, prompt, selectedImage);
+    document.getElementById('output0').textContent = result;
+  } catch(e) {
+    document.getElementById('output0').textContent = '识别失败: ' + e.message;
+    showToast('识别失败: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    loading.style.display = 'none';
+  }
+}
+
+function clearPanel0() {
+  selectedImage = null;
+  document.getElementById('imgInput').value = '';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadPreview').src = '';
+  document.getElementById('uploadLabel').textContent = '📷 点击上传图片 或 长按粘贴';
+  document.getElementById('uploadArea').classList.remove('has-image');
+  document.getElementById('output0').textContent = '—';
+}
+
+async function pasteImage() {
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find(t => t.startsWith('image/'));
+      if (imageType) {
+        const blob = await item.getType(imageType);
+        const file = new File([blob], 'pasted.png', { type: imageType });
+        onImageSelected({ target: { files: [file] } });
+        return;
+      }
+    }
+    showToast('剪贴板中没有图片');
+  } catch(e) {
+    showToast('请允许访问剪贴板权限后重试');
+  }
+}
+
+// ════════════════════════════════
+// FORMAT 1 — 排版助手
+// ════════════════════════════════
+
+// Letter to position mapping (民间习惯: k=2, p=2)
+const LETTER_MAP = { m:1, k:2, t:3, s:4, b:5, w:7, p:2 };
+
+function parseInvestment(text) {
+  // Parse investment notation like rm3A2, 3B2S, 1B1.5S, etc.
+  // Returns {big, small, a1} values
+  let big = 0, small = 0, a1 = 0;
+
+  // Strip currency prefix like rm, RM
+  let t = text.replace(/^rm/i, '').trim();
+
+  // Pattern: number followed by B/S/A1
+  // e.g. 3A2 => big=3, a1=2 (no S mentioned)
+  // e.g. 2B3S => big=2, small=3
+  // e.g. 3B2A1 => big=3, a1=2
+
+  // Try: NB NS pattern
+  const bMatch = t.match(/(\d+(?:\.\d+)?)B/i);
+  const sMatch = t.match(/(\d+(?:\.\d+)?)S/i);
+  const aMatch = t.match(/(\d+(?:\.\d+)?)A(?:1)?(?!\d)/i);
+
+  if (bMatch) big = parseFloat(bMatch[1]);
+  if (sMatch) small = parseFloat(sMatch[1]);
+  if (aMatch) a1 = parseFloat(aMatch[1]);
+
+  // Pattern like 3A2 (no B/S) => Big=3, A1=2
+  if (!bMatch && !sMatch && !aMatch) {
+    const plain = t.match(/^(\d+(?:\.\d+)?)A(\d+(?:\.\d+)?)$/i);
+    if (plain) { big = parseFloat(plain[1]); a1 = parseFloat(plain[2]); }
+  }
+
+  return { big, small, a1 };
+}
+
+function formatInvestment(big, small, a1) {
+  // Returns #B#S#A1 string (skip zeros except when needed)
+  const parts = [];
+  if (big > 0 || small > 0 || a1 > 0) {
+    parts.push('#' + fmt(big));
+    parts.push('#' + fmt(small));
+    parts.push('#' + fmt(a1));
+  }
+  return parts.join('');
+}
+
+function fmt(n) {
+  if (n === 0) return '0';
+  return n % 1 === 0 ? String(n) : n.toFixed(1);
+}
+
+function runFormat1() {
+  const raw = document.getElementById('input1').value.trim();
+  if (!raw) { showToast('请先输入文本'); return; }
+
+  const result = /\d{4}--/.test(raw) ? processFormat1MultiDash(raw)
+               : raw.includes('_')   ? processFormat1Underscore(raw)
+               : processFormat1(raw);
+  document.getElementById('output1').textContent = result;
+}
+
+// Handle NNNN--2. 2. 1  lbox H E format
+function processFormat1MultiDash(raw) {
+  const segRegex = /(\d{4})--([\s\S]*?)(?=\d{4}--|$)/g;
+  const segments = [];
+  let m;
+  while ((m = segRegex.exec(raw)) !== null) {
+    segments.push({ num: m[1], rest: m[2].trim() });
+  }
+  if (!segments.length) return processFormat1(raw);
+
+  // Collect company letters (strip box keywords first so 'l' in lbox isn't mistaken for company L)
+  const compLetters = [];
+  for (const { rest } of segments) {
+    const cleanedForComp = rest.replace(/lbox|ibox|bbox|box/gi, '');
+    for (const ch of cleanedForComp.toUpperCase()) {
+      if (SARA_MAP[ch] !== undefined && !compLetters.includes(ch)) {
+        compLetters.push(ch);
+      }
+    }
+  }
+  const header = '#' + compLetters.map(l => SARA_MAP[l]).join('');
+
+  const lines = [header];
+  for (const { num, rest } of segments) {
+    const isIBox = /lbox|ibox/i.test(rest);
+    const isBox  = /\bbox\b/i.test(rest) && !isIBox;
+    // Remove keywords and letters, extract numeric amounts
+    const cleaned = rest.replace(/lbox|ibox|bbox|box/gi, '').replace(/[a-zA-Z]/g, ' ');
+    const amounts = [...cleaned.matchAll(/(\d+(?:\.\d+)?)/g)].map(x => parseFloat(x[1]));
+    const big   = amounts[0] !== undefined ? amounts[0] : 0;
+    const small = amounts[1] !== undefined ? amounts[1] : 0;
+    const a1    = amounts[2] !== undefined ? amounts[2] : 0;
+    const prefix = isIBox ? '**' : isBox ? '*' : '';
+    lines.push(`${prefix}${num}#${fmt(big)}#${fmt(small)}#${fmt(a1)}`);
+  }
+  return lines.join('\n');
+}
+
+function processFormat1(raw) {
+  const isQuanBao = /全保/i.test(raw) || /\*\*/.test(raw);
+
+  // Normalize separators and commas
+  let text = raw.replace(/，/g, ',').replace(/…/g, ' ').replace(/\.\.\./g, ' ');
+
+  // Split into space/comma-separated tokens
+  const tokens = text.split(/[\s,]+/).filter(Boolean);
+
+  // Find company code letters and investment token
+  let companyLetters = '';
+  let investmentToken = '';
+  const skipPatterns = /^(rm|sgd)$/i;
+
+  for (const tok of tokens) {
+    if (/^[a-zA-Z]+$/.test(tok) && !skipPatterns.test(tok)) {
+      companyLetters = tok;
+    } else if (/^(rm|sgd)?[\d.]+[bsa]\d*/i.test(tok) || /^[\d.]+[bsa]/i.test(tok)) {
+      investmentToken = tok;
+    } else if (/^rm\d/i.test(tok)) {
+      investmentToken = tok;
+    }
+  }
+
+  // Build company header
+  let companyHeader = '#';
+  if (companyLetters) {
+    for (const l of companyLetters.toLowerCase()) {
+      if (LETTER_MAP[l] !== undefined) companyHeader += LETTER_MAP[l];
+    }
+  }
+
+  // Parse investment suffix
+  let investSuffix = '';
+  if (investmentToken) {
+    const { big, small, a1 } = parseInvestment(investmentToken);
+    investSuffix = formatInvestment(big, small, a1);
+  } else {
+    const dollarMatch = raw.match(/\$(\d+(?:\.\d+)?)/);
+    if (dollarMatch) investSuffix = '#' + fmt(parseFloat(dollarMatch[1]));
+  }
+
+  // Collect all 4-digit numbers
+  // Numbers can be in tokens as standalone "1128" or dash-separated "1128-4602-7718"
+  const nums = [];
+  for (const tok of tokens) {
+    if (/^[a-zA-Z]+$/.test(tok)) continue;
+    if (/^(rm|\$)/i.test(tok) && !/\d{4}/.test(tok)) continue;
+
+    // Dash-separated chain: "1128-4602-7718-6764-5651-7071"
+    // Each segment is a 4-digit number; the dash is just a separator (no amount attached)
+    if (/^\d{4}(-\d{4})+$/.test(tok)) {
+      const parts = tok.split('-');
+      for (const p of parts) nums.push({ num: p, suffix: '' });
+      continue;
+    }
+
+    // Single 4-digit with optional amount suffix: "8177-1" → num=8177, suffix=#1
+    const m = tok.match(/^(\d{4})((?:[#-]\d+)*)(-?)$/);
+    if (m) {
+      const suffix = m[2].replace(/-/g, '#');
+      nums.push({ num: m[1], suffix });
+    }
+  }
+
+  // Build output lines
+  const lines = [];
+  for (let i = 0; i < nums.length; i++) {
+    const { num, suffix } = nums[i];
+    if (isQuanBao) {
+      // All numbers get ** prefix; first one also gets the amount, rest get it too if no own suffix
+      lines.push('**' + num + investSuffix);
+    } else {
+      // Use own suffix if present, otherwise append investSuffix
+      lines.push(num + (suffix || investSuffix));
+    }
+  }
+
+  return companyHeader + '\n' + lines.join('\n');
+}
+
+// Handle NNNN_2_5912_23071_ ... _ibox_mpth format
+function processFormat1Underscore(raw) {
+  // Split by _ and trim
+  const tokens = raw.split('_').map(t => t.trim()).filter(Boolean);
+
+  let companyLetters = [];
+  let isIBox = false;
+  let isBox  = false;
+  const entries = []; // {num, big}
+  let pendingNum = null;
+
+  for (const tok of tokens) {
+    // IBox / Box
+    if (/^i\s*box$/i.test(tok)) { isIBox = true; continue; }
+    if (/^b\s*box$|^bbox$/i.test(tok)) { isBox = true; continue; }
+
+    // Company letters possibly with trailing "2天" etc — strip non-letter tail
+    const compPart = tok.replace(/\d+[\u5929\u65e5].*$/, '').trim(); // strip "2天"
+    if (compPart && /^[a-zA-Z]+$/.test(compPart)) {
+      for (const ch of compPart.toLowerCase()) {
+        if (LETTER_MAP[ch] !== undefined && !companyLetters.includes(ch)) companyLetters.push(ch);
+      }
+      continue;
+    }
+
+    // 4-digit number
+    if (/^\d{4}$/.test(tok)) {
+      if (pendingNum !== null) entries.push({ num: pendingNum, big: 1 });
+      pendingNum = tok;
+      continue;
+    }
+
+    // 5-digit: first digit = amount for pendingNum, last 4 = next number
+    if (/^\d{5}$/.test(tok)) {
+      const amt = parseInt(tok[0]);
+      const nextNum = tok.slice(1);
+      if (pendingNum !== null) entries.push({ num: pendingNum, big: amt });
+      pendingNum = nextNum;
+      continue;
+    }
+
+    // 1-3 digit amount for pending number
+    if (/^\d{1,3}$/.test(tok) && pendingNum !== null) {
+      entries.push({ num: pendingNum, big: parseInt(tok) });
+      pendingNum = null;
+      continue;
+    }
+  }
+  if (pendingNum !== null) entries.push({ num: pendingNum, big: 1 });
+
+  // Build company header
+  let header = '#';
+  for (const l of companyLetters) {
+    if (LETTER_MAP[l] !== undefined) header += LETTER_MAP[l];
+  }
+
+  const prefix = isIBox ? '**' : isBox ? '*' : '';
+  const lines = [header];
+  for (const e of entries) {
+    lines.push(`${prefix}${e.num}#${e.big}#0#0`);
+  }
+  return lines.join('\n');
+}
+
+// ════════════════════════════════
+// FORMAT 2 — 查理斯
+// ════════════════════════════════
+function runFormat2() {
+  const raw = document.getElementById('input2').value.trim();
+  if (!raw) { showToast('请先输入文本'); return; }
+
+  const result = processCharles(raw);
+  document.getElementById('output2').textContent = result;
+}
+
+function processCharles(raw) {
+  const lines = raw.split('\n');
+  const sections = []; // [{company, lines:[]}]
+  let curCompany = null;
+  let curLines = [];
+
+  for (const rawLine of lines) {
+    // Normalize box variants before any matching:
+    // "bo x", "b o x", "b bix", "b box", "bbox", "box" → all become "bbox"
+    const line = stripWA(rawLine).trim()
+      // ibox: any spacing/parens around i-b-o-x
+      .replace(/\(?\bi\s*b\s*o\s*x\b\)?/gi, 'ibox')
+      // "b box" / "b bo x" / "b b o x" etc — b + whitespace + b-o-x with any internal spaces
+      .replace(/\bb\s+b\s*o\s*x\b/gi, 'bbox')
+      // "(Box)" / "box" / "bo x" / "b ox" / "b o x" — box with any internal spaces
+      .replace(/\(?\bb\s*o\s*x\b\)?/gi, 'bbox')
+      // Fix: "1b bbox" / "1b ibox" → "1 bbox" / "1 ibox" (amount glued to 'b' before box marker)
+      .replace(/(\d)b\s+(bbox|ibox)/gi, '$1 $2')
+      // Fix: "1b" at end of line (no box marker after) → "1" (strip trailing b)
+      .replace(/(\d)b(\s*)$/gi, '$1$2');
+    if (!line) continue;
+
+    // Detect company line: any line containing L and/or N (case insensitive)
+    // that does NOT look like a bet line (no 4-digit number)
+    // e.g. "L3n3", "LN", "Ln", "*LN", "L", "N"
+    if (!/\d{4}/.test(line)) {
+      const hasL = /l/i.test(line);
+      const hasN = /n/i.test(line);
+      if (hasL || hasN) {
+        if (curLines.length) sections.push({ company: curCompany, lines: curLines });
+        if (hasL && hasN) curCompany = '#98';
+        else if (hasL) curCompany = '#9';
+        else curCompany = '#8';
+        curLines = [];
+        continue;
+      }
+    }
+
+    // Skip pure header/meta lines (TT header, date lines, etc.)
+    if (/^\(TT\)$/i.test(line)) continue;
+    if (/^\d{6}\s+\d{4}\s+\(\d+\)$/.test(line)) continue;
+    if (/^\(\d+\)$/.test(line)) continue;
+    if (/^\d{2}\/\d{2}$/.test(line)) continue;
+    if (/^[A-Za-z]{1,4}$/.test(line) && !/^(bbox|box|ibox|HE)$/i.test(line)) {
+      // Single letter section markers like "L" already handled above
+      continue;
+    }
+
+    // Parse bet line
+    // Formats: "2200 1", "2224 1 b box", "4747 1 bbox", "4700 2"
+    // Also: "5803=4B", "7979=1B (Box)", "5803=5B (IBox)"
+    // Also: "5999 1b box", "15041" (no space)
+
+    // Try format: XXXX=NB [(IBox|Box)]
+    let m = line.match(/^(\d{4})=(\d+(?:\.\d+)?)B?\s*(ibox|bbox)?/i);
+    if (m) {
+      const num = m[1];
+      const amt = m[2];
+      const boxType = (m[3]||'').toLowerCase();
+      let prefix = '';
+      if (boxType === 'ibox') prefix = '**';
+      else if (boxType === 'bbox') prefix = '*';
+      curLines.push(prefix + num + '#' + amt);
+      continue;
+    }
+
+    // Try format: XXXX N [bbox | ibox] — space separated, or XXXXN (no space, last digit is amount)
+    // Handle "15041" as 1504 + 1
+    m = line.match(/^(\d{4})\s*(\d+(?:\.\d+)?)\s*(bbox|ibox)?/i);
+    if (m) {
+      const num = m[1];
+      const amt = m[2];
+      const boxRaw = (m[3]||'').toLowerCase();
+      let prefix = '';
+      if (boxRaw === 'ibox') prefix = '**';
+      else if (boxRaw === 'bbox') prefix = '*';
+      curLines.push(prefix + num + '#' + amt);
+      continue;
+    }
+
+    // 5-digit run-on like "25151" → 2515 + 1, "72091" → 7209 + 1
+    m = line.match(/^(\d{4})(\d)$/);
+    if (m) {
+      curLines.push(m[1] + '#' + m[2]);
+      continue;
+    }
+  }
+
+  if (curLines.length) sections.push({ company: curCompany, lines: curLines });
+
+  // Build output
+  const out = [];
+  for (const sec of sections) {
+    if (sec.company) out.push(sec.company);
+    out.push(...sec.lines);
+  }
+
+  return out.join('\n');
+}
+
+// ════════════════════════════════
+// FORMAT 3 — ABC
+// ════════════════════════════════
+function runFormat3() {
+  const raw = document.getElementById('input3').value.trim();
+  if (!raw) { showToast('请先输入文本'); return; }
+
+  const result = processABC(raw);
+  document.getElementById('output3').textContent = result;
+}
+
+function processABC(raw) {
+  const lines = raw.split('\n');
+  const out = [];
+  let pastGT = false;
+
+  // Header cleanup: convert "260414 1855 (61483)" → "26.04.14 1855" + "(61483)"
+  // Remove (COPY)
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Remove (COPY)
+    if (/^\(COPY\)$/i.test(line)) continue;
+
+    // Once GT is found, copy everything as-is
+    if (/^GT\s*=/.test(line)) pastGT = true;
+    if (pastGT) { out.push(line); continue; }
+
+    // Header: "260414 1855 (61483)" → "26.04.14 1855" then "(61483)" on next line
+    const hdrMatch = line.match(/^(\d{2})(\d{2})(\d{2})\s+(\d{4})\s+\((\d+)\)$/);
+    if (hdrMatch) {
+      out.push(`${hdrMatch[1]}.${hdrMatch[2]}.${hdrMatch[3]} ${hdrMatch[4]}`);
+      out.push(`(${hdrMatch[5]})`);
+      continue;
+    }
+
+    // Bet line: "XXXX=NB [NS] [(IBox|Box)]"
+    // Pattern: 4digits = amounts + optional box
+    const betMatch = line.match(/^(\d{4})\s*=\s*(.+)$/);
+    if (betMatch) {
+      const num = betMatch[1];
+      const rest = betMatch[2];
+
+      // Extract box type
+      let boxSuffix = '';
+      const iboxMatch = rest.match(/\(IBox\)/i);
+      const boxMatch = rest.match(/\(Box\)/i);
+      if (iboxMatch) boxSuffix = ' (IBox)';
+      else if (boxMatch) boxSuffix = ' (Box)';
+
+      // Extract B and S amounts
+      const bM = rest.match(/(\d+(?:\.\d+)?)\s*B(?!ox)/i);
+      const sM = rest.match(/(\d+(?:\.\d+)?)\s*S(?!A)/i);
+      const bigAmt  = bM ? parseFloat(bM[1]) : 0;
+      const smlAmt  = sM ? parseFloat(sM[1]) : 0;
+
+      // Calculate positions
+      // B → D1, E1 (÷2 each)
+      // S → A1, B1, C1 (÷3 each)
+      const dVal = bigAmt > 0 ? bigAmt / 2 : 0;
+      const aVal = smlAmt > 0 ? smlAmt / 3 : 0;
+
+      const parts = [];
+      if (aVal > 0) parts.push(`${fmt(aVal)}A1`, `${fmt(aVal)}B1`, `${fmt(aVal)}C1`);
+      if (dVal > 0) parts.push(`${fmt(dVal)}D1`, `${fmt(dVal)}E1`);
+
+      out.push(`${num}=${parts.join(' ')}${boxSuffix}`);
+      continue;
+    }
+
+    // Everything else — output as-is
+    out.push(line);
+  }
+
+  return out.join('\n');
+}
+
+// ════════════════════════════════
+// UTILS
+// ════════════════════════════════
+// Strip WhatsApp timestamps: [4/14, 6:54 PM] Name: ...
+function stripWA(line) {
+  return line.replace(/^\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}(?:\s*[AP]M)?\]\s*[^:]+:\s*/i, '').trim();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function copyOutput(i) {
+  const text = document.getElementById('output' + i).textContent;
+  if (!text || text === '—') { showToast('没有内容可复制'); return; }
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast('已复制！')).catch(() => fallbackCopy(text));
+  } else fallbackCopy(text);
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); showToast('已复制！'); } catch { showToast('复制失败'); }
+  document.body.removeChild(ta);
+}
+
+async function pasteTo(id) {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById(id).value = text;
+    showToast('已粘贴！');
+  } catch(e) {
+    showToast('请直接长按输入框粘贴');
+  }
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ════════════════════════════════
+// FORMAT 4 — 沙拉
+// ════════════════════════════════
+const SARA_MAP = { M:'1', P:'2', T:'3', S:'4', B:'5', K:'6', W:'7', H:'8', E:'9', L:'L', N:'N' };
+const SARA_LETTERS = new Set(['M','P','T','S','B','K','W','H','E','L','N']);
+// Only open Wed(3), Sat(6), Sun(0)
+const WEEKLY_ONLY = new Set(['M','P','T','S','B','K','W']);
+const DAILY = new Set(['H','E','L','N']);
+
+let tomorrowMode = false;
+let yqMode = false;
+
+function toggleYQ() {
+  yqMode = !yqMode;
+  const btn = document.getElementById('yqBtn');
+  if (yqMode) {
+    btn.style.cssText = 'border:1.5px solid var(--blue);color:#fff;background:var(--blue);font-weight:600;white-space:nowrap';
+  } else {
+    btn.style.cssText = 'border:1.5px solid var(--blue);color:var(--blue);font-weight:600;white-space:nowrap';
+  }
+}
+
+function toggleTomorrow() {
+  tomorrowMode = !tomorrowMode;
+  const btn = document.getElementById('tomorrowBtn');
+  if (tomorrowMode) {
+    btn.textContent = '📅 明日模式: 开';
+    btn.style.color = 'var(--warn)';
+    btn.style.borderColor = 'var(--warn)';
+    btn.style.background = 'rgba(220,96,39,0.08)';
+  } else {
+    btn.textContent = '📅 明日模式: 关';
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--warn)';
+    btn.style.background = 'transparent';
+  }
+}
+
+function todayAvailableLetters() {
+  if (tomorrowMode) return SARA_LETTERS; // skip date filter
+  const day = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const isWeeklyDay = day === 0 || day === 3 || day === 6;
+  return isWeeklyDay ? SARA_LETTERS : DAILY;
+}
+
+// Calculate box permutations for a 4-digit number string
+function boxPerms(num) {
+  const freq = {};
+  for (const d of num) freq[d] = (freq[d] || 0) + 1;
+  let denom = 1;
+  for (const f of Object.values(freq)) for (let i = 2; i <= f; i++) denom *= i;
+  return 24 / denom; // 4! = 24
+}
+
+function runFormat4() {
+  const raw = document.getElementById('input4').value.trim();
+  if (!raw) { showToast('请先输入文本'); return; }
+
+  if (yqMode) {
+    const container = document.getElementById('output4container');
+    container.innerHTML = '';
+    const blocks = splitWABlocks(raw);
+    let anyOutput = false;
+    for (const b of blocks) {
+      const result = processYQ(b);
+      if (result.trim()) { container.appendChild(makeCard(result)); anyOutput = true; }
+    }
+    if (!anyOutput) container.innerHTML = '<div class="output">未识别到内容</div>';
+    return;
+  }
+
+  const blocks = splitWABlocks(raw);
+  const available = todayAvailableLetters();
+  const container = document.getElementById('output4container');
+  container.innerHTML = '';
+
+  let grandTotal = 0;
+  let cardIndex = 0;
+
+  for (const b of blocks) {
+    const { text, total } = processSaraBlock(b, available);
+    if (!text) continue;
+    grandTotal += total;
+
+    const cards = splitToCards(text);
+    for (const cardText of cards) {
+      cardIndex++;
+      container.appendChild(makeCard(cardText));
+    }
+  }
+
+  if (!cardIndex) {
+    container.innerHTML = '<div class="output">未识别到投注内容</div>';
+    return;
+  }
+
+  const day = new Date().getDay();
+  const isWeeklyDay = day === 0 || day === 3 || day === 6;
+  const filterNote = (tomorrowMode || isWeeklyDay) ? '' : '\n⚠️ 今天非星期三/六/日，已自动过滤 M/P/T/S/B/K/W';
+  const totalDiv = document.createElement('div');
+  totalDiv.style.cssText = 'font-family:var(--mono);font-size:12px;padding:10px 4px;color:var(--muted);white-space:pre-wrap;border-top:1px solid var(--border);margin-top:4px';
+  totalDiv.textContent = '💰 总计需付：RM ' + grandTotal.toFixed(2) + filterNote;
+  container.appendChild(totalDiv);
+}
+
+// Split text block into ≤39-line cards, repeating header on continuation cards
+function splitToCards(text) {
+  const lines = text.split('\n');
+  if (lines.length <= 39) return [text];
+
+  const hasHeader = lines[0].startsWith('#');
+  const header = hasHeader ? lines[0] : null;
+  const body = hasHeader ? lines.slice(1) : lines;
+  const maxBody = hasHeader ? 38 : 39;
+
+  const cards = [];
+  for (let i = 0; i < body.length; i += maxBody) {
+    const chunk = body.slice(i, i + maxBody);
+    cards.push(header ? header + '\n' + chunk.join('\n') : chunk.join('\n'));
+  }
+  return cards;
+}
+
+// Create a single output card with copy button
+function makeCard(text) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-bottom:12px';
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:4px';
+
+  const btn = document.createElement('button');
+  btn.textContent = '复制';
+  btn.style.cssText = 'background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 16px;cursor:pointer;transition:background .2s,color .2s';
+
+  const outDiv = document.createElement('div');
+  outDiv.className = 'output';
+  outDiv.style.marginBottom = '0';
+  outDiv.textContent = text;
+
+  btn.onclick = function() {
+    const t = outDiv.textContent;
+    const b = this;
+    const markDone = () => {
+      b.textContent = '✓ 已复制';
+      b.style.background = 'var(--warn)';
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(t).then(markDone).catch(() => { fallbackCopy(t); markDone(); });
+    } else {
+      fallbackCopy(t);
+      markDone();
+    }
+  };
+
+  btnRow.appendChild(btn);
+  wrap.appendChild(btnRow);
+  wrap.appendChild(outDiv);
+  return wrap;
+}
+
+function splitWABlocks(raw) {
+  const lines = raw.split('\n');
+  const waRe = /^\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}/;
+  const hasWA = lines.some(l => waRe.test(l));
+  if (!hasWA) return [raw];
+  const blocks = [];
+  let cur = [];
+  for (const line of lines) {
+    if (waRe.test(line)) { if (cur.length) blocks.push(cur.join('\n')); cur = [line]; }
+    else cur.push(line);
+  }
+  if (cur.length) blocks.push(cur.join('\n'));
+  return blocks.filter(b => b.trim());
+}
+
+function processSaraBlock(raw, available) {
+  const lines = raw.split('\n').map(stripWA).filter(l => l.length > 0);
+
+  // Support multiple company sections within one block
+  const sections = []; // [{letters, entries}]
+  let curLetters = [];
+  let curEntries = [];
+  let pastGT = false;
+  let lastBig = 1, lastSmall = 0, lastA1 = 0;
+  let headerCompanySet = false; // true = company appeared BEFORE bets (header style)
+
+  const flushSection = () => {
+    if (curEntries.length > 0) {
+      sections.push({ letters: [...curLetters], entries: curEntries });
+      curEntries = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (/^GT\s*=/i.test(line)) { pastGT = true; continue; }
+    if (pastGT) continue;
+
+    // Skip meta lines
+    if (/^\(TT\)$/i.test(line)) continue;
+    if (/^\(COPY\)$/i.test(line)) continue;
+    if (/^\(\d+\)$/.test(line)) continue;
+    if (/^\d{2}\/\d{2}$/.test(line)) continue;
+    if (/^\d{2}\.\d{2}\.\d{2}\s+\d{4}$/.test(line)) continue;
+    if (/^\d{6}\s+\d{4}/.test(line)) continue;
+    if (/^\d{1,2}[A-Za-z]{3}$/.test(line)) continue;
+    if (/^(FREE|DRAGON|NINE|MAGNUM|TOTO|SPORTS)\b/i.test(line)) continue;
+    if (/^Points:/i.test(line)) continue;
+    if (/^RM\d/i.test(line)) continue;
+    if (/^\d+\+\d/.test(line)) continue;
+
+    // Company code line (also handle parenthesised markers like (LN), (L), (N))
+    const compMatch = line.match(/^\*?([A-Za-z]+)$/) || line.match(/^\(([A-Za-z]+)\)$/);
+    if (compMatch) {
+      const letters = compMatch[1].toUpperCase().split('');
+      if (letters.every(l => SARA_LETTERS.has(l))) {
+        if (curEntries.length > 0) {
+          if (headerCompanySet) {
+            // Previous company was a header → flush pending entries with it, new company is next header
+            flushSection();
+            curLetters = letters;
+            headerCompanySet = true;
+          } else {
+            // No header was set → this company is a footer for pending entries
+            curLetters = letters;
+            flushSection();
+            headerCompanySet = false;
+          }
+        } else {
+          // No pending entries → company is a header for upcoming bets
+          flushSection();
+          curLetters = letters;
+          headerCompanySet = true;
+        }
+        lastBig = 1; lastSmall = 0; lastA1 = 0;
+        continue;
+      }
+    }
+
+    // Bet line: NNNN#5#2#1# or NNNN#3# or NNNN#5ibox / NNNN#5bbox
+    const hashBetMatch = line.match(/^(\*{0,2})(\d{4})((?:#\d+(?:\.\d+)?)+)#?\s*(ibox|bbox)?$/i);
+    if (hashBetMatch) {
+      const prefix = hashBetMatch[1];
+      const num = hashBetMatch[2];
+      const vals = hashBetMatch[3].split('#').filter(s => s !== '').map(parseFloat);
+      lastBig   = vals[0] !== undefined ? vals[0] : 0;
+      lastSmall = vals[1] !== undefined ? vals[1] : 0;
+      lastA1    = vals[2] !== undefined ? vals[2] : 0;
+      const suffixBox = (hashBetMatch[4] || '').toLowerCase();
+      const isIBox = prefix === '**' || suffixBox === 'ibox';
+      const isBox  = (prefix === '*' && !isIBox) || suffixBox === 'bbox';
+      const finalPrefix = isIBox ? '**' : isBox ? '*' : prefix;
+      curEntries.push({ prefix: finalPrefix, num, big: lastBig, small: lastSmall, a1: lastA1, isBox, isIBox });
+      continue;
+    }
+
+    // Bet line: NNNN=amounts OR NNNN-amounts
+    const betMatch = line.match(/^(\d{4})\s*[=\-]\s*(.+)$/);
+    if (betMatch) {
+      const num = betMatch[1];
+      const rest = betMatch[2].replace(/-(?=[0-9])/g, ' ');
+      const isIBox = /ibox/i.test(rest);
+      const isBox  = /\bbox\b/i.test(rest) && !isIBox;
+      const bM = rest.match(/(\d+(?:\.\d+)?)\s*B(?!ox)/i);
+      const sM = rest.match(/(\d+(?:\.\d+)?)\s*S(?!A)/i);
+      const aM = rest.match(/(\d+(?:\.\d+)?)\s*A1?(?!\d)/i);
+      if (bM || sM || aM) {
+        // Explicit B/S/A labels
+        lastBig   = bM ? parseFloat(bM[1]) : 0;
+        lastSmall = sM ? parseFloat(sM[1]) : 0;
+        lastA1    = aM ? parseFloat(aM[1]) : 0;
+      } else {
+        // No labels — extract all numbers in order as big, small, a1
+        const restClean = rest.replace(/ibox|bbox/gi, '').trim();
+        const nums = [...restClean.matchAll(/(\d+(?:\.\d+)?)/g)].map(m => parseFloat(m[1]));
+        lastBig   = nums[0] !== undefined ? nums[0] : 0;
+        lastSmall = nums[1] !== undefined ? nums[1] : 0;
+        lastA1    = nums[2] !== undefined ? nums[2] : 0;
+      }
+      curEntries.push({ prefix: isIBox ? '**' : isBox ? '*' : '', num, big: lastBig, small: lastSmall, a1: lastA1, isBox, isIBox });
+      continue;
+    }
+
+    // Bare 4-digit
+    const bareMatch = line.match(/^(\d{4})$/);
+    if (bareMatch) {
+      curEntries.push({ prefix: '', num: bareMatch[1], big: lastBig, small: lastSmall, a1: lastA1, isBox: false, isIBox: false });
+      continue;
+    }
+  }
+
+  // Flush last section
+  flushSection();
+
+  if (!sections.length) return { text: null, total: 0 };
+
+  const outLines = [];
+  let blockTotal = 0;
+
+  for (const sec of sections) {
+    const filteredLetters = sec.letters.filter(l => available.has(l));
+    const sides = filteredLetters.length || 1;
+    const header = filteredLetters.length ? '#' + filteredLetters.map(l => SARA_MAP[l]).join('') : '';
+    if (header) outLines.push(header);
+
+    for (const e of sec.entries) {
+      outLines.push(`${e.prefix}${e.num}#${fmt(e.big)}#${fmt(e.small)}#${fmt(e.a1)}`);
+      const base = e.big + e.small + e.a1;
+      let cost;
+      if (e.isIBox) cost = base * sides;
+      else if (e.isBox) cost = base * boxPerms(e.num) * sides;
+      else cost = base * sides;
+      blockTotal += cost;
+    }
+  }
+
+  return { text: outLines.join('\n'), total: blockTotal };
+}
+
+// ════════════════════════════════
+// YQ MODE — convert company letters to numbers, remove empty lines
+// ════════════════════════════════
+function processYQ(raw) {
+  const lines = raw.split('\n');
+  const out = [];
+
+  for (const line of lines) {
+    const trimmed = stripWA(line);
+
+    // Remove empty lines
+    if (!trimmed) continue;
+
+    // Company line: optional * + only letters that are all in SARA_MAP
+    const compMatch = trimmed.match(/^\*?([A-Za-z]+)$/);
+    if (compMatch) {
+      const letters = compMatch[1].toUpperCase().split('');
+      if (letters.length > 0 && letters.every(l => SARA_MAP[l] !== undefined)) {
+        out.push('#' + letters.map(l => SARA_MAP[l]).join(''));
+        continue;
+      }
+    }
+
+    // Everything else: keep as-is
+    out.push(trimmed);
+  }
+
+  return out.join('\n');
+}
+
+// ════════════════════════════════
+// FORMAT 5 — l3n3
+// ════════════════════════════════
+let lnMode = false;
+
+function toggleLNMode() {
+  lnMode = !lnMode;
+  const btn = document.getElementById('lnModeBtn');
+  if (lnMode) {
+    btn.style.background = '#e53e3e';
+    btn.style.color = '#fff';
+    btn.style.borderColor = '#e53e3e';
+  } else {
+    btn.style.background = 'transparent';
+    btn.style.color = '#e53e3e';
+    btn.style.borderColor = '#e53e3e';
+  }
+}
+
+function transformCompanyLine(line) {
+  // Match lines like *E, *H, *EH, *HE, *EHN etc (optional leading * + letters only)
+  const m = line.match(/^(\*?)([A-Za-z]+)$/);
+  if (!m) return null;
+  const hasStar = m[1] === '*';
+  const letters = m[2].toUpperCase();
+
+  // Only transform if line contains E or H (and nothing else unexpected)
+  const hasE = letters.includes('E');
+  const hasH = letters.includes('H');
+  if (!hasE && !hasH) return null;
+  // Must only contain E and H (no other letters that aren't E/H)
+  if (!/^[EH]+$/.test(letters)) return null;
+
+  if (lnMode) {
+    // *E→(L), *H→(N), *EH→(LN)
+    if (hasE && hasH) return '(LN)';
+    if (hasE) return '(L)';
+    return '(N)';
+  } else {
+    // *E→(L3), *H→(N3), *EH→(L3N3)
+    if (hasE && hasH) return '(L3N3)';
+    if (hasE) return '(L3)';
+    return '(N3)';
+  }
+}
+
+function runFormat5() {
+  const raw = document.getElementById('input5').value.trim();
+  if (!raw) { showToast('请先输入文本'); return; }
+  document.getElementById('output5').textContent = processL3N3(raw);
+}
+
+function processL3N3(raw) {
+  const lines = raw.split('\n');
+  const out = [];
+  let gtFound = false;
+
+  for (const line of lines) {
+    if (gtFound) continue; // skip everything after GT line
+
+    // Check if this is the GT line — keep it, then stop
+    if (/^GT\s*=/i.test(line.trim())) {
+      out.push(line);
+      gtFound = true;
+      continue;
+    }
+
+    const trimmed = line.trim();
+
+    // Skip (TT) line
+    if (/^\(TT\)$/i.test(trimmed)) continue;
+
+    // Date line: DD/MM → {MMDD}
+    const dateMatch = trimmed.match(/^(\d{2})\/(\d{2})$/);
+    if (dateMatch) {
+      const leading = line.match(/^(\s*)/)[1];
+      out.push(leading + '{' + dateMatch[2] + dateMatch[1] + '}');
+      continue;
+    }
+
+    // Try to transform company marker line
+    const transformed = transformCompanyLine(trimmed);
+    if (transformed !== null) {
+      const leading = line.match(/^(\s*)/)[1];
+      out.push(leading + transformed);
+    } else {
+      out.push(line);
+    }
+  }
+
+  return out.join('\n');
+}
+
+async function printOutput(outputId) {
+  const text = document.getElementById(outputId).textContent;
+  if (!text || text === '—') { showToast('没有内容可打印'); return; }
+
+  if (!navigator.bluetooth) {
+    showToast('此浏览器不支持 Web Bluetooth，改用系统打印');
+    printViaDialog(text);
+    return;
+  }
+
+  try {
+    showToast('正在搜索打印机...');
+    // MP58-04 and similar cheap thermal printers use these BLE service UUIDs
+    const PRINTER_SERVICES = [
+      '000018f0-0000-1000-8000-00805f9b34fb',  // Generic thermal
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',  // Common ESC/POS BLE
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455',  // ISSC BLE Serial
+    ];
+    const PRINTER_CHARS = [
+      '00002af1-0000-1000-8000-00805f9b34fb',
+      'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+      '49535343-8841-43f4-a8d4-ecbe34729bb3',
+    ];
+
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: PRINTER_SERVICES
+    });
+
+    showToast('连接中...');
+    const server = await device.gatt.connect();
+
+    let writeChar = null;
+    for (const svcUUID of PRINTER_SERVICES) {
+      try {
+        const svc = await server.getPrimaryService(svcUUID);
+        for (const charUUID of PRINTER_CHARS) {
+          try {
+            const ch = await svc.getCharacteristic(charUUID);
+            if (ch.properties.write || ch.properties.writeWithoutResponse) {
+              writeChar = ch;
+              break;
+            }
+          } catch {}
+        }
+        if (writeChar) break;
+      } catch {}
+    }
+
+    if (!writeChar) {
+      // Try getting any writable characteristic
+      const services = await server.getPrimaryServices();
+      outer: for (const svc of services) {
+        const chars = await svc.getCharacteristics();
+        for (const ch of chars) {
+          if (ch.properties.write || ch.properties.writeWithoutResponse) {
+            writeChar = ch; break outer;
+          }
+        }
+      }
+    }
+
+    if (!writeChar) throw new Error('找不到可写入的打印特征值');
+
+    showToast('打印中...');
+    await sendEscPos(writeChar, text);
+    showToast('打印完成 ✓');
+    device.gatt.disconnect();
+
+  } catch(e) {
+    // Any failure: fall back to system print dialog
+    printViaDialog(text);
+    if (e.name === 'NotFoundError' || e.message?.includes('cancel') || e.message?.includes('Cancel')) {
+      showToast('蓝牙未连接，已改用系统打印');
+    } else {
+      showToast('蓝牙失败，已改用系统打印：' + e.message);
+    }
+  }
+}
+
+async function shareOutput(outputId) {
+  const text = document.getElementById(outputId).textContent;
+  if (!text || text === '—') { showToast('没有内容可分享'); return; }
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch(e) {}
+  }
+  // 桌面端 fallback：打开 wa.me
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+// ESC/POS: send text in chunks (BLE MTU ~20 bytes)
+async function sendEscPos(char, text) {
+  const encoder = new TextEncoder();
+  // ESC @ = initialize printer
+  const init = new Uint8Array([0x1B, 0x40]);
+  // GS ! 0x10 = double height only (1.5x effect, narrower than full double)
+  const bigFont = new Uint8Array([0x1D, 0x21, 0x10]);
+  // ESC d 4 = feed 4 lines
+  const feed = new Uint8Array([0x1B, 0x64, 0x04]);
+
+  const textBytes = encoder.encode(text + '\n');
+  const full = new Uint8Array(init.length + bigFont.length + textBytes.length + feed.length);
+  full.set(init, 0);
+  full.set(bigFont, init.length);
+  full.set(textBytes, init.length + bigFont.length);
+  full.set(feed, init.length + bigFont.length + textBytes.length);
+
+  // Send in 20-byte chunks
+  const CHUNK = 20;
+  const useWriteNoResp = !char.properties.write && char.properties.writeWithoutResponse;
+  for (let i = 0; i < full.length; i += CHUNK) {
+    const chunk = full.slice(i, i + CHUNK);
+    if (useWriteNoResp) {
+      await char.writeValueWithoutResponse(chunk);
+    } else {
+      await char.writeValue(chunk);
+    }
+    // Small delay to avoid overflow
+    await new Promise(r => setTimeout(r, 30));
+  }
+}
+
+function printViaDialog(text) {
+  let el = document.getElementById('printTarget');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'printTarget';
+    el.style.display = 'none';
+    document.querySelector('.wrap').appendChild(el);
+  }
+  el.textContent = text;
+  window.print();
+}
+
+// ════════════════════════════════
+// FORMAT 6 — XF 报表对比
+// ════════════════════════════════
+
+function runFormat6() {
+  const input = document.getElementById('input6').value.trim();
+  if (!input) { showToast('请输入报表文本'); return; }
+
+  try {
+    // 提取日期
+    const dateFromMatch = input.match(/Date From\s*:\s*(\d{4}-\d{2}-\d{2})/);
+    const dateToMatch = input.match(/Date To\s*:\s*(\d{4}-\d{2}-\d{2})/);
+    let dateFromFormatted = '';
+    let dateToFormatted = '';
+
+    if (dateFromMatch && dateToMatch) {
+      const [yf, mf, df] = dateFromMatch[1].split('-');
+      const [yt, mt, dt] = dateToMatch[1].split('-');
+      dateFromFormatted = `${df}/${mf}/${yf.slice(-2)}`;
+      dateToFormatted = `${dt}/${mt}/${yt.slice(-2)}`;
+    }
+
+    // 提取 MYR 部分各项 Total Net
+    const myrMPTSKBW = extractTotalNet(input, 'MYR', 'MPTSKBW');
+    const myrH = extractTotalNet(input, 'MYR', 'H');
+    const myrE = extractTotalNet(input, 'MYR', 'E');
+
+    // 提取 SGD 部分各项 Total Net
+    const sgdMPTSKBW = extractTotalNet(input, 'SGD', 'MPTSKBW');
+    const sgdH = extractTotalNet(input, 'SGD', 'H');
+    const sgdE = extractTotalNet(input, 'SGD', 'E');
+
+    const myrItems = [
+      { val: myrMPTSKBW, name: 'MPTSKBW' },
+      { val: myrH, name: 'H' },
+      { val: myrE, name: 'E' }
+    ].filter(x => x.val !== null);
+
+    const sgdItems = [
+      { val: sgdMPTSKBW, name: 'MPTSKBW' },
+      { val: sgdH, name: 'H' },
+      { val: sgdE, name: 'E' }
+    ].filter(x => x.val !== null);
+
+    if (myrItems.length === 0 && sgdItems.length === 0) {
+      showToast('无法提取数据，请检查格式');
+      return;
+    }
+
+    // 格式化数字（小数点对齐）
+    const allVals = [...myrItems.map(x => x.val), ...sgdItems.map(x => x.val)];
+    const maxIntLen = Math.max(...allVals.map(v => Math.floor(v).toString().length));
+
+    function formatAligned(val) {
+      const str = val.toFixed(2);
+      const [intPart, decPart] = str.split('.');
+      const padding = ' '.repeat(Math.max(0, maxIntLen - intPart.length));
+      return padding + intPart + '.' + decPart;
+    }
+
+    // 生成 MYR 表格
+    let myrHTML = '';
+    myrItems.forEach(item => {
+      myrHTML += `<div>${formatAligned(item.val)}</div>`;
+    });
+
+    // 生成 SGD 表格
+    let sgdHTML = '';
+    sgdItems.forEach(item => {
+      sgdHTML += `<div>${formatAligned(item.val)}</div>`;
+    });
+
+    const myrTotal = myrItems.reduce((sum, x) => sum + x.val, 0);
+    const sgdTotal = sgdItems.reduce((sum, x) => sum + x.val, 0);
+
+    document.getElementById('xfTableRM').innerHTML = myrHTML;
+    document.getElementById('xfTableSGD').innerHTML = sgdHTML;
+    document.getElementById('rmTotal').textContent = formatAligned(myrTotal);
+    document.getElementById('sgdTotal').textContent = formatAligned(sgdTotal);
+    document.getElementById('xfDateDisplay').textContent = `${dateFromFormatted}到${dateToFormatted}`;
+    document.getElementById('output6Container').style.display = 'block';
+    document.getElementById('output6Message').style.display = 'none';
+
+    // 保存日期供 share 函数使用
+    window.xfDateFrom = dateFromFormatted;
+    window.xfDateTo = dateToFormatted;
+
+    showToast('生成成功');
+  } catch(e) {
+    showToast('处理失败: ' + e.message);
+  }
+}
+
+function extractTotalNet(text, currency, company) {
+  // 格式: "MYR : MPTSKBW\nTotal Sales  :   1,289.60\n...\nTotal Net    :     824.99" 或负数
+  const pattern = new RegExp(
+    `${currency}\\s*:\\s*${company}.*?Total Net\\s*:\\s*(-?[\\d,\\.]+)`,
+    's'
+  );
+  const match = text.match(pattern);
+  if (match && match[1]) {
+    return parseFloat(match[1].replace(/,/g, ''));
+  }
+  return null;
+}
+
+// 把 XF 预览内容拼成纯文本（复制降级 / WhatsApp 分享共用）
+function buildXFText() {
+  const rmLines = document.getElementById('xfTableRM').innerText.split('\n').filter(x => x.trim());
+  const sgdLines = document.getElementById('xfTableSGD').innerText.split('\n').filter(x => x.trim());
+  const rmTotal = document.getElementById('rmTotal').textContent;
+  const sgdTotal = document.getElementById('sgdTotal').textContent;
+
+  const dateFrom = window.xfDateFrom || '';
+  const dateTo = window.xfDateTo || '';
+
+  let text = `从${dateFrom}到${dateTo}的账目\n\n`;
+  text += 'RM'.padEnd(20) + 'SGD\n';
+  const maxLen = Math.max(rmLines.length, sgdLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const rm = rmLines[i] || '';
+    const sgd = sgdLines[i] || '';
+    text += rm.padEnd(20) + sgd + '\n';
+  }
+  text += '─'.repeat(20) + '─'.repeat(15) + '\n';
+  text += rmTotal.padEnd(20) + sgdTotal;
+  return text;
+}
+
+async function copyXFImage() {
+  const element = document.getElementById('output6Preview');
+  if (!element) { showToast('无内容可复制'); return; }
+
+  try {
+    if (typeof html2canvas === 'undefined') {
+      // 降级：直接复制文本
+      await navigator.clipboard.writeText(buildXFText());
+      showToast('已复制文本');
+      return;
+    }
+
+    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#fff' });
+    canvas.toBlob(blob => {
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      showToast('图片已复制');
+    });
+  } catch(e) {
+    showToast('复制失败: ' + e.message);
+  }
+}
+
+function shareXFWhatsApp() {
+  const encodedText = encodeURIComponent(buildXFText());
+  window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+}
+
+async function downloadXFImage() {
+  const element = document.getElementById('output6Preview');
+  if (!element) { showToast('无内容可分享'); return; }
+
+  try {
+    // 检查是否有 html2canvas
+    if (typeof html2canvas === 'undefined') {
+      showToast('需要加载图片库，请刷新页面后重试');
+      return;
+    }
+
+    // 生成图片
+    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#fffacd' });
+    const dateFrom = window.xfDateFrom || 'report';
+    const dateTo = window.xfDateTo || '';
+    const filename = `account-${dateFrom}-to-${dateTo}.png`;
+
+    canvas.toBlob(async blob => {
+      // 尝试使用 Web Share API（移动设备优先）
+      if (navigator.share) {
+        try {
+          const file = new File([blob], filename, { type: 'image/png' });
+          await navigator.share({
+            files: [file],
+            title: '账目报表',
+            text: `从${dateFrom}到${dateTo}的账目报表`
+          });
+          showToast('已分享到WhatsApp');
+          return;
+        } catch(err) {
+          if (err.name !== 'AbortError') {
+            console.log('Share failed:', err);
+          }
+        }
+      }
+
+      // 备选：复制到剪贴板并提示用户手动分享
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        showToast('图片已复制，请在WhatsApp中粘贴分享');
+        // 打开 WhatsApp
+        const ua = navigator.userAgent.toLowerCase();
+        if (ua.includes('android') || ua.includes('iphone') || ua.includes('ipad')) {
+          window.location.href = 'whatsapp://';
+        } else {
+          window.open('https://web.whatsapp.com/', '_blank');
+        }
+      } catch(clipErr) {
+        showToast('分享失败，请重试');
+      }
+    });
+  } catch(e) {
+    showToast('生成图片失败: ' + e.message);
+  }
+}
+
+// ════════════════════════════════
+// PANEL 7: 中奖 (LOTTERY CHECKER)
+// ════════════════════════════════
+
+// 生成数字的所有排列（Box expansion）
+function generatePermutations(digits) {
+  if (digits.length === 0) return [];
+  if (digits.length === 1) return [digits];
+
+  const result = [];
+  for (let i = 0; i < digits.length; i++) {
+    const char = digits[i];
+    const remaining = digits.slice(0, i) + digits.slice(i + 1);
+    for (let perm of generatePermutations(remaining)) {
+      result.push(char + perm);
+    }
+  }
+  return result;
+}
+
+// 获取号码库数据
+function getLotteryDatabase() {
+  const data = localStorage.getItem('lotteryDatabase');
+  return data ? JSON.parse(data) : [];
+}
+
+// 导出号码库为 JSON 文件
+function exportLotteryData() {
+  const db = getLotteryDatabase();
+  if (db.length === 0) { showToast('号码库为空，无需导出'); return; }
+
+  const json = JSON.stringify(db, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lottery_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ 已导出 ${db.length} 期数据`);
+}
+
+// 导入号码库从 JSON 文件
+function importLotteryData(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      if (!Array.isArray(raw)) throw new Error('格式错误');
+
+      // 校验条目结构与日期格式，剔除异常数据（日期会被直接渲染，必须受控）
+      const imported = raw.filter(entry =>
+        entry && typeof entry === 'object' &&
+        (entry.date == null || /^\d{4}-\d{2}-\d{2}$/.test(entry.date)) &&
+        entry.data && typeof entry.data === 'object'
+      );
+      if (imported.length === 0) throw new Error('格式错误');
+
+      const existing = getLotteryDatabase();
+      // 合并：以日期为 key，导入的覆盖已有的
+      const merged = [...existing];
+      for (let entry of imported) {
+        const idx = merged.findIndex(e => e.date === entry.date);
+        if (idx >= 0) {
+          merged[idx] = entry; // 覆盖
+        } else {
+          merged.push(entry); // 新增
+        }
+      }
+
+      saveLotteryDatabase(merged);
+      showToast(`✓ 已导入 ${imported.length} 期数据，共 ${merged.length} 期`);
+    } catch (err) {
+      showToast('❌ 导入失败：文件格式不正确');
+    }
+    input.value = ''; // 重置 input 以便再次选择
+  };
+  reader.readAsText(file);
+}
+
+// 保存号码库数据
+function saveLotteryDatabase(db) {
+  localStorage.setItem('lotteryDatabase', JSON.stringify(db));
+  updateLotteryStatus();
+}
+
+// 更新号码库状态显示
+function updateLotteryStatus() {
+  const db = getLotteryDatabase();
+  const total = db.reduce((sum, entry) => {
+    const counts = Object.keys(entry.data).reduce((s, type) => {
+      const nums = entry.data[type];
+      return s + Object.keys(nums).reduce((c, level) => c + nums[level].split(' ').length, 0);
+    }, 0);
+    return sum + counts;
+  }, 0);
+
+  const dates = db.map(e => e.date).join(', ') || '无';
+  document.getElementById('lotteryLibStatus').innerHTML =
+    `号码库状态：共 ${db.length} 期，${total} 个号码 | 日期：${dates}`;
+}
+
+// 解析开彩号码文本
+function parseLotteryData(text) {
+  const result = { date: null, data: { L3: {}, L: {}, N3: {}, N: {} } };
+
+  // 提取日期并统一为 YYYY-MM-DD 格式
+  const dateMatch = text.match(/(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+  if (dateMatch) {
+    const [, yyyy, mm, dd] = dateMatch;
+    result.date = `${yyyy}-${mm}-${dd}`; // 确保统一为连字符格式
+  }
+
+  // 分割为行并处理
+  const lines = text.split('\n');
+  let currentType = null;
+  let currentSection = null; // 'prize' (1/2/3) 或 'S' 或 'C'
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // 检测类型（跳过6D）
+    if (line.match(/^Lucky\s+3.*30/i) && !line.match(/6D/i)) {
+      currentType = 'L3';
+      currentSection = 'prize';
+      continue;
+    } else if (line.match(/^Lucky\s*$/i) || (line.match(/^Lucky\s/) && !line.match(/3.*30/i) && !line.match(/6D/i))) {
+      currentType = 'L';
+      currentSection = 'prize';
+      continue;
+    } else if (line.match(/^Perdana\s+3.*30/i) && !line.match(/6D/i)) {
+      currentType = 'N3';
+      currentSection = 'prize';
+      continue;
+    } else if (line.match(/^Perdana\s*$/i) || (line.match(/^Perdana\s/) && !line.match(/3.*30/i) && !line.match(/6D/i))) {
+      currentType = 'N';
+      currentSection = 'prize';
+      continue;
+    }
+
+    // 跳过6D行
+    if (line.match(/6D/i)) {
+      currentType = null;
+      continue;
+    }
+
+    if (!currentType) continue;
+
+    // 检测S/C（支持 "S:" 单行 和 "S:6340" 行内两种格式）
+    if (line.match(/^S:/i)) {
+      currentSection = 'S';
+      const inlineNum = line.match(/^S:(\d{4})/i);
+      if (inlineNum) {
+        if (!result.data[currentType]['S']) result.data[currentType]['S'] = '';
+        result.data[currentType]['S'] += (result.data[currentType]['S'] ? ' ' : '') + inlineNum[1];
+      }
+      continue;
+    } else if (line.match(/^C:/i)) {
+      currentSection = 'C';
+      const inlineNum = line.match(/^C:(\d{4})/i);
+      if (inlineNum) {
+        if (!result.data[currentType]['C']) result.data[currentType]['C'] = '';
+        result.data[currentType]['C'] += (result.data[currentType]['C'] ? ' ' : '') + inlineNum[1];
+      }
+      continue;
+    }
+
+    // 解析1/2/3奖 - 支持有无括号字母两种格式
+    // 格式1（爬虫）: "1:0930 2:7018 3:7556"
+    // 格式2（其他）: "1:2220 (J) 2:4655 (G) 3:8489 (C)"
+    if (currentSection === 'prize') {
+      const matches = line.matchAll(/(\d+):(\d{4})(?:\s*\([^)]*\))?/g);
+      for (let match of matches) {
+        const level = match[1];
+        const number = match[2];
+        if (level && number) {
+          if (!result.data[currentType][level]) result.data[currentType][level] = '';
+          result.data[currentType][level] += (result.data[currentType][level] ? ' ' : '') + number;
+        }
+      }
+    } else if (currentSection === 'S') {
+      const matches = line.matchAll(/\d{4}/g);
+      for (let match of matches) {
+        if (!result.data[currentType]['S']) result.data[currentType]['S'] = '';
+        result.data[currentType]['S'] += (result.data[currentType]['S'] ? ' ' : '') + match[0];
+      }
+    } else if (currentSection === 'C') {
+      const matches = line.matchAll(/\d{4}/g);
+      for (let match of matches) {
+        if (!result.data[currentType]['C']) result.data[currentType]['C'] = '';
+        result.data[currentType]['C'] += (result.data[currentType]['C'] ? ' ' : '') + match[0];
+      }
+    }
+  }
+
+  return result;
+}
+
+// 辅助：从标记字符串提取彩票公司列表（L3/N3/L/N）
+function extractCompanies(marker) {
+  const m = marker.toUpperCase();
+  const result = [];
+  if (m.includes('L3')) result.push('L3');
+  else if (m.includes('L')) result.push('L');
+  if (m.includes('N3')) result.push('N3');
+  else if (m.includes('N')) result.push('N');
+  return result;
+}
+
+// 解析单个票根块，返回 tickets 数组
+function parseTicketBlock(block) {
+  const tickets = [];
+
+  // 提取日期，支持多种格式：
+  // 格式1: YY.MM.DD (如 26.04.24)
+  // 格式2: {MMDD} (如 {0427} = 2026-04-27)
+  // 格式3: DD/MM (如 24/04)
+  let blockDate = '';
+  const d1 = block.match(/(\d{2})\.(\d{2})\.(\d{2})/);
+  if (d1) {
+    const [, yy, mm, dd] = d1;
+    blockDate = `20${yy}-${mm}-${dd}`;
+  } else {
+    const d2 = block.match(/\{(\d{2})(\d{2})\}/);
+    if (d2) {
+      const [, mm, dd] = d2;
+      const year = new Date().getFullYear();
+      blockDate = `${year}-${mm}-${dd}`;
+    } else {
+      const d3 = block.match(/(\d{2})\/(\d{2})/);
+      if (d3) {
+        const [, dd, mm] = d3;
+        const year = new Date().getFullYear();
+        blockDate = `${year}-${mm}-${dd}`;
+      }
+    }
+  }
+
+  // 提取单号：
+  // 格式1: (69057) 括号内5位以上
+  // 格式2: 990427131508(V4) 括号外的长数字（8位以上，后接括号或行尾）
+  let blockDoc = '';
+  const doc1 = block.match(/\((\d{5,})\)/);
+  if (doc1) {
+    blockDoc = doc1[1];
+  } else {
+    const doc2 = block.match(/\b(\d{8,})\b/);
+    if (doc2) blockDoc = doc2[1];
+  }
+
+  // 找出已售罄号码
+  const soldOutNumbers = new Set();
+  const lines = block.split('\n');
+  for (let line of lines) {
+    if (line.includes('(S.O)')) {
+      const m = line.match(/(\d{4})/);
+      if (m) soldOutNumbers.add(m[1]);
+    }
+  }
+
+  let currentCompanies = [];
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+
+    // 星号标记：*HELN, *LN, *MPTSHEN, *HEN 等
+    if (line.startsWith('*')) {
+      // 无论有没有 L/N，都更新 currentCompanies
+      // *H → [] → 此区块号码不参与配对
+      currentCompanies = extractCompanies(line.substring(1));
+      continue;
+    }
+
+    // 括号标记：(L3N3), (LN), (L), (N3) 等
+    if (/^\([A-Z0-9]+\)$/.test(line)) {
+      const inner = line.slice(1, -1);
+      const cos = extractCompanies(inner);
+      if (cos.length > 0) { currentCompanies = cos; continue; }
+    }
+
+    // 只处理投注行（必须以4位数字开头后接 =）
+    if (!/^\d{4}=/.test(line)) continue;
+    if (currentCompanies.length === 0) continue;
+
+    const betMatch = line.match(/^(\d{4})=(.+?)(?:\s+\((Box|IBox|iBox)\))?$/i);
+    if (!betMatch) continue;
+
+    const number = betMatch[1];
+    if (soldOutNumbers.has(number)) continue;
+
+    const betStr = betMatch[2].trim();
+    const boxType = betMatch[3] ? betMatch[3].toUpperCase() : null;
+    const isBox = boxType === 'IBOX' || boxType === 'BOX';
+    const isIBox = boxType === 'IBOX';
+
+    let big = 0, small = 0, a1 = 0;
+    for (let part of betStr.split(/\s+/)) {
+      // 支持两种格式：数字在前(5B) 或 字母在前(B5)
+      const m = part.match(/^([A-Z]+)([\d.]+)$/i) || part.match(/^([\d.]+)([A-Z]+)$/i);
+      if (m) {
+        // 判断哪个是字母哪个是数字
+        const isLetterFirst = /^[A-Z]/i.test(part);
+        const t = isLetterFirst ? m[1].toUpperCase() : m[2].toUpperCase();
+        const amt = isLetterFirst ? parseFloat(m[2]) : parseFloat(m[1]);
+        if (t === 'B') big = amt;
+        else if (t === 'S') small = amt;
+        else if (t === 'A1') a1 = amt;
+      }
+    }
+
+    if (big || small || a1) {
+      for (let company of currentCompanies) {
+        tickets.push({
+          number, big, small, a1, isBox, isIBox, company,
+          date: blockDate,
+          doc: blockDoc,
+          record: `${blockDoc}-${number}`
+        });
+      }
+    }
+  }
+
+  return tickets;
+}
+
+// 解析票根数据 - 支持多种分块格式
+function parseTicketData(text) {
+  let blocks = [];
+
+  // 优先按 WhatsApp 时间戳分块：[4/19, 4:10 PM] 发送人:
+  if (/\[\d+\/\d+,\s*\d+:\d+\s*[AP]M\]/i.test(text)) {
+    blocks = text.split(/(?=\[\d+\/\d+,\s*\d+:\d+\s*[AP]M\])/i);
+  }
+  // 其次按 (TT) 分块
+  else if (/^\(TT\)/im.test(text)) {
+    blocks = text.split(/(?=^\(TT\))/im);
+  }
+  // 最后整体作为一块
+  else {
+    blocks = [text];
+  }
+
+  const tickets = [];
+  for (let block of blocks) {
+    if (block.trim()) {
+      tickets.push(...parseTicketBlock(block));
+    }
+  }
+
+  return tickets;
+}
+
+// 按日期合并一期开彩数据到号码库并保存
+function mergeLotteryEntry(parsed) {
+  const db = getLotteryDatabase();
+  const existingIndex = db.findIndex(e => e.date === parsed.date);
+  if (existingIndex >= 0) {
+    const existing = db[existingIndex];
+    for (let type in parsed.data) {
+      for (let level in parsed.data[type]) {
+        if (existing.data[type][level]) {
+          existing.data[type][level] += ' ' + parsed.data[type][level];
+        } else {
+          existing.data[type][level] = parsed.data[type][level];
+        }
+      }
+    }
+  } else {
+    db.push(parsed);
+  }
+  saveLotteryDatabase(db);
+}
+
+// 添加开彩号码到库
+async function addLotteryToLib() {
+  const text = document.getElementById('input7LotteryRaw').value.trim();
+  if (!text) { showToast('请粘贴开彩号码'); return; }
+
+  const parsed = parseLotteryData(text);
+
+  if (!parsed.date) {
+    showToast('⚠️ 未能识别日期，请确保包含日期信息');
+  }
+
+  // 检查是否有任何有效数据
+  const hasData = Object.keys(parsed.data).some(type =>
+    Object.keys(parsed.data[type]).length > 0
+  );
+
+  if (!hasData) {
+    showToast('无法解析号码数据，请检查格式');
+    return;
+  }
+
+  mergeLotteryEntry(parsed);
+  document.getElementById('input7LotteryRaw').value = '';
+  showToast('✓ 已添加到号码库');
+}
+
+// 计算奖金
+function calculatePrize(level, amount, isBox, number) {
+  const prizeMap = {
+    '1': 3000,
+    '2': 1000,
+    '3': 500,
+    'S': 200,
+    'C': 60
+  };
+
+  let basePrize = prizeMap[level] || 0;
+  let totalPrize = basePrize * amount;
+
+  if (isBox) {
+    totalPrize = totalPrize / boxPerms(String(number));
+  }
+
+  return totalPrize.toFixed(2);
+}
+
+// 检查中奖
+async function checkWinning() {
+  const ticketText = document.getElementById('input7Ticket').value.trim();
+  if (!ticketText) { showToast('请粘贴票根号码'); return; }
+
+  const db = getLotteryDatabase();
+  if (db.length === 0) { showToast('号码库为空，请先添加开彩号码'); return; }
+
+  const tickets = parseTicketData(ticketText);
+  if (tickets.length === 0) { showToast('无法解析票根数据，请检查格式'); return; }
+
+  let winningResults = []; // 存储所有中奖结果
+
+  for (let ticket of tickets) {
+    const { number, big, small, a1, isBox, isIBox, company, date: ticketDate, doc, record } = ticket;
+    const totalBet = big + small + a1;
+
+    // 检查每个日期的数据
+    for (let entry of db) {
+      const lotteryDate = entry.date || '';
+
+      // 日期匹配
+      if (ticketDate) {
+        const normalizedTicketDate = ticketDate.replace(/\//g, '-');
+        const normalizedLotteryDate = lotteryDate.replace(/\//g, '-');
+        if (normalizedTicketDate !== normalizedLotteryDate) continue;
+      }
+
+      // 仅检查对应公司的数据
+      if (!entry.data[company]) continue;
+      const typeData = entry.data[company];
+
+      // 检查各奖项
+      for (let level in typeData) {
+        const nums = typeData[level].split(' ').filter(n => n);
+
+        // 直接匹配（号码完全相同）
+        if (nums.includes(number)) {
+          // IBox 直接中：奖金 ÷ 排列数
+          const prize = calculatePrize(level, totalBet, isIBox, number);
+          winningResults.push({
+            date: lotteryDate, doc: doc || '-', record: record || number,
+            level, company, winningNum: number, userNum: number,
+            isBox: isIBox, bet: totalBet, prize,
+            typeStr: isIBox ? 'IBox' : (isBox ? 'Box' : '')
+          });
+        }
+
+        // Box/IBox 排列匹配（买的号码的其他排列中奖）
+        if (isBox) {
+          const perms = generatePermutations(number);
+          for (let perm of perms) {
+            if (perm !== number && nums.includes(perm)) {
+              // IBox：奖金 ÷ 排列数；Box（正Box）：全额
+              const prize = calculatePrize(level, totalBet, isIBox, number);
+              winningResults.push({
+                date: lotteryDate, doc: doc || '-', record: record || number,
+                level, company, winningNum: perm, userNum: number,
+                isBox: true, bet: totalBet, prize,
+                typeStr: isIBox ? 'IBox' : 'Box'
+              });
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 生成表格输出
+  let htmlOutput = '';
+
+  if (winningResults.length === 0) {
+    htmlOutput = '<p style="color:var(--muted);text-align:center;padding:20px">未中奖</p>';
+  } else {
+    const levelMap = { '1': '1st', '2': '2nd', '3': '3rd', 'S': 'S', 'C': 'C' };
+
+    // ① 日期升序排列（从小到大）
+    winningResults.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    htmlOutput = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table style="border-collapse:collapse;font-size:15px;background:#fff;min-width:480px;width:100%">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Date</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Doc</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Record</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Type</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Bet</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;font-size:15px">Amt</th>
+          </tr>
+          <tr><td colspan="6" style="padding:0;border-bottom:2px solid #ddd"></td></tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (let result of winningResults) {
+      const levelStr = levelMap[result.level] || result.level;
+      const boxStr = result.typeStr === 'IBox' ? ' - IBox' : (result.typeStr === 'Box' ? ' - Box' : '');
+      const typeDisplay = `${result.company} - ${levelStr}${boxStr}`;
+      // Record 显示开彩号码（winningNum），不是票根号码
+      const recordNum = result.winningNum;
+
+      htmlOutput += `
+        <tr style="border-bottom:1px solid #ddd">
+          <td style="padding:7px 10px;white-space:nowrap;font-size:15px;color:#111">${result.date}</td>
+          <td style="padding:7px 10px;color:var(--accent);font-weight:700;white-space:nowrap;font-size:15px">${result.doc}</td>
+          <td style="padding:7px 10px;white-space:nowrap;font-size:15px;color:#111">${recordNum}</td>
+          <td style="padding:7px 10px;white-space:nowrap;font-size:15px;color:#111">${typeDisplay}</td>
+          <td style="padding:7px 10px;white-space:nowrap;font-size:15px;color:#111">${result.bet}</td>
+          <td style="padding:7px 10px;font-weight:700;white-space:nowrap;font-size:15px;color:#111">${result.prize}</td>
+        </tr>
+      `;
+    }
+
+    htmlOutput += `</tbody></table></div>`;
+  }
+
+  // 输出到表格容器
+  const outputDiv = document.getElementById('output7');
+  outputDiv.innerHTML = htmlOutput;
+
+  // 如果有中奖结果，自动生成卡片
+  if (winningResults.length > 0) {
+    document.getElementById('cardSection').style.display = 'block';
+    window._lastWinningResults = winningResults;
+    // 自动触发卡片生成
+    setTimeout(() => generateCard(), 100);
+  } else {
+    document.getElementById('cardSection').style.display = 'none';
+  }
+}
+
+// 生成卡片图片
+async function generateCard() {
+  const results = window._lastWinningResults;
+  if (!results || results.length === 0) return;
+
+  const levelMap = { '1': '1st', '2': '2nd', '3': '3rd', 'S': 'S', 'C': 'C' };
+
+  // 日期升序排列
+  results.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  // 计算总额
+  const total = results.reduce((sum, r) => sum + parseFloat(r.prize || 0), 0).toFixed(2);
+
+  // 构建卡片 HTML（隔行条纹）
+  let rows = results.map((r, i) => {
+    const levelStr = levelMap[r.level] || r.level;
+    const boxStr = r.typeStr === 'IBox' ? ' - IBox' : (r.typeStr === 'Box' ? ' - Box' : '');
+    const typeStr = `${r.company} - ${levelStr}${boxStr}`;
+    // 始终用开彩号码（winningNum）
+    const recordNum = r.winningNum;
+    const bg = i % 2 === 0 ? '#ffffff' : '#f7f9f7';
+    return `
+      <tr style="background:${bg}">
+        <td style="padding:7px 12px;color:#111;font-size:16px;white-space:nowrap">${r.date}</td>
+        <td style="padding:7px 12px;color:#00a87a;font-weight:700;font-size:16px;white-space:nowrap">${r.doc}</td>
+        <td style="padding:7px 12px;color:#111;font-size:16px;white-space:nowrap">${recordNum}</td>
+        <td style="padding:7px 12px;color:#111;font-size:16px;white-space:nowrap">${typeStr}</td>
+        <td style="padding:7px 12px;color:#111;font-size:16px;white-space:nowrap">${r.bet}</td>
+        <td style="padding:7px 12px;color:#111;font-weight:700;font-size:16px;white-space:nowrap">${r.prize}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const cardHtml = `
+    <div style="background:#fff;padding:0;font-family:Arial,sans-serif;width:720px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#e8ede8">
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Date</th>
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Doc</th>
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Record</th>
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Type</th>
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Bet</th>
+            <th style="padding:10px 12px;text-align:left;font-size:16px;font-weight:700;color:#111;white-space:nowrap">Amt</th>
+          </tr>
+          <tr><td colspan="6" style="padding:0;border-bottom:2px solid #ccc;height:2px"></td></tr>
+        </thead>
+        <tbody>
+          ${rows}
+          <tr style="background:#e8ede8;border-top:2px solid #ccc">
+            <td colspan="5" style="padding:8px 12px;font-size:16px;font-weight:700;color:#111;text-align:right">Total</td>
+            <td style="padding:8px 12px;font-size:16px;font-weight:700;color:#00a87a;white-space:nowrap">${total}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const template = document.getElementById('cardTemplate');
+  template.innerHTML = cardHtml;
+
+  try {
+    const canvas = await html2canvas(template.firstElementChild, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true
+    });
+
+    const imgUrl = canvas.toDataURL('image/png');
+    const imgEl = document.getElementById('cardImage');
+    imgEl.src = imgUrl;
+    document.getElementById('cardPreview').style.display = 'block';
+    document.getElementById('shareWaBtn').style.display = 'inline-flex';
+    document.getElementById('downloadBtn').style.display = 'inline-flex';
+    window._cardImageUrl = imgUrl;
+    window._cardCanvas = canvas;
+  } catch(e) {
+    showToast('生成图片失败: ' + e.message);
+  }
+}
+
+// 下载卡片图片
+function downloadCard() {
+  if (!window._cardImageUrl) return;
+  const a = document.createElement('a');
+  a.href = window._cardImageUrl;
+  a.download = `中奖结果_${new Date().toISOString().split('T')[0]}.png`;
+  a.click();
+}
+
+// WhatsApp 分享图片（无文字，只发图片）
+async function shareCardToWhatsApp() {
+  if (!window._cardCanvas) return;
+
+  // 尝试使用 Web Share API（手机上支持直接分享图片）
+  if (navigator.share && navigator.canShare) {
+    try {
+      window._cardCanvas.toBlob(async (blob) => {
+        const file = new File([blob], 'result.png', { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+        } else {
+          downloadCard();
+          showToast('请下载图片后手动发送到 WhatsApp');
+        }
+      });
+      return;
+    } catch(e) {
+      // 用户取消，不报错
+    }
+  }
+
+  // 桌面端：下载
+  downloadCard();
+  showToast('图片已下载，请手动发送到 WhatsApp');
+}
+
+// 删除指定日期的开彩号码
+function deleteLotteryByDate(date) {
+  if (!confirm(`确认删除 ${date} 的所有开彩号码吗？此操作无法撤销。`)) {
+    return;
+  }
+
+  const db = getLotteryDatabase();
+  const filtered = db.filter(entry => entry.date !== date);
+  saveLotteryDatabase(filtered);
+  showToast(`✓ 已删除 ${date} 的开彩号码`);
+
+  // 重新渲染历史菜单
+  renderLotteryHistory();
+}
+
+// 渲染历史号码库
+function renderLotteryHistory() {
+  const db = getLotteryDatabase();
+
+  // 渲染日期网格
+  let gridHtml = '';
+  let contentHtml = '';
+
+  if (db.length === 0) {
+    gridHtml = '<p style="color:var(--muted);grid-column:1/-1">暂无号码</p>';
+    contentHtml = '<p style="color:var(--muted)">暂无号码</p>';
+  } else {
+    // 按日期倒序排列
+    const sorted = [...db].sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return b.date.localeCompare(a.date);
+    });
+
+    // 日期网格卡片
+    for (let entry of sorted) {
+      const dateStr = escapeHtml(entry.date || '未知日期');
+      const typeList = Object.keys(entry.data).filter(type =>
+        Object.keys(entry.data[type]).length > 0
+      );
+      const typeCount = typeList.length;
+
+      gridHtml += `
+        <div style="padding:10px;background:#fff;border:1px solid var(--border);border-radius:4px;position:relative;cursor:pointer;transition:all .2s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'" onclick="scrollToDate('${dateStr}')">
+          <div style="font-weight:600;font-size:12px;margin-bottom:4px">${dateStr}</div>
+          <div style="font-size:10px;color:var(--muted)">${typeCount} 种类型</div>
+          <button class="hbtn" style="position:absolute;top:4px;right:4px;padding:2px 6px;font-size:9px" onclick="event.stopPropagation(); deleteLotteryByDate('${dateStr}')">删除</button>
+        </div>
+      `;
+    }
+
+    // 详细内容列表
+    for (let entry of sorted) {
+      const dateStr = escapeHtml(entry.date || '未知日期');
+      contentHtml += `<div id="date-${dateStr.replace(/-/g, '')}" style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">\n`;
+      contentHtml += `<strong style="font-size:12px">${dateStr}</strong>\n`;
+      contentHtml += `<div style="margin-top:8px;font-size:10px;color:var(--muted)">\n`;
+
+      for (let type in entry.data) {
+        const typeData = entry.data[type];
+        if (Object.keys(typeData).length > 0) {
+          contentHtml += `<div style="margin:4px 0"><strong>${escapeHtml(type)}:</strong> `;
+          const nums = [];
+          for (let level in typeData) {
+            const levelName = { '1': '特奖', '2': '二奖', '3': '三奖', 'S': '入围奖', 'C': '安慰奖' }[level] || level;
+            nums.push(`${escapeHtml(levelName)}:${escapeHtml(typeData[level])}`);
+          }
+          contentHtml += nums.join(' | ');
+          contentHtml += '</div>\n';
+        }
+      }
+
+      contentHtml += `</div></div>\n`;
+    }
+  }
+
+  document.getElementById('lotteryDateGrid').innerHTML = gridHtml;
+  document.getElementById('lotteryHistoryContent').innerHTML = contentHtml;
+}
+
+// 滚动到指定日期
+function scrollToDate(date) {
+  const id = 'date-' + date.replace(/-/g, '');
+  const element = document.getElementById(id);
+  if (element) {
+    const container = document.getElementById('lotteryHistoryContent');
+    container.scrollTop = element.offsetTop - 50;
+  }
+}
+
+// 切换历史号码菜单
+function toggleLotteryHistory() {
+  const modal = document.getElementById('lotteryHistoryModal');
+  const isVisible = modal.style.display !== 'none';
+
+  if (isVisible) {
+    modal.style.display = 'none';
+  } else {
+    renderLotteryHistory();
+    modal.style.display = 'block';
+  }
+}
+
+// ════════════════════════════════
+// 自动抓取开彩号码
+// ════════════════════════════════
+
+async function autoFetchLottery(slot) {
+  const btn = document.getElementById('autoFetchBtn');
+  const originalText = btn.textContent;
+  btn.textContent = '⏳ 抓取中...';
+  btn.disabled = true;
+
+  try {
+    // 调用本地爬虫服务器
+    const response = await fetch('http://localhost:3000/api/lottery', {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      throw new Error(`服务器错误 ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+
+    // 格式化数据为应用需要的格式
+    const lotteryText = formatScrapedData(result.data);
+
+    if (lotteryText) {
+      document.getElementById('input7LotteryRaw').value = lotteryText;
+
+      // 自动保存到数据库
+      const parsed = parseLotteryData(lotteryText);
+      if (parsed.date && Object.keys(parsed.data).some(type =>
+        Object.keys(parsed.data[type]).length > 0
+      )) {
+        mergeLotteryEntry(parsed);
+        showToast('✓ 自动抓取成功，已保存到号码库');
+        // 按时段记录成功日期（16 点、20 点各抓一次；手动点击不带 slot，不写标记）
+        if (slot) localStorage.setItem('lastAutoFetch_' + slot, new Date().toISOString().split('T')[0]);
+      } else {
+        showToast('✓ 自动抓取成功，已显示在文本框');
+      }
+    } else {
+      showToast('⚠️ 未能解析号码，请检查服务器是否运行');
+    }
+  } catch (error) {
+    console.error('Fetch error:', error);
+    // 判断错误类型提供不同提示
+    if (error.message.includes('Failed to fetch')) {
+      showToast('❌ 无法连接本地服务器。请确保：\n1. 运行了 npm install express puppeteer cors\n2. 运行了 node lottery-scraper.js\n3. 服务器在 http://localhost:3000');
+    } else {
+      showToast('❌ 抓取失败: ' + error.message);
+    }
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+// 格式化爬虫返回的数据
+function formatScrapedData(data) {
+  let result = `${data.date}\n\n`;
+
+  // 辅助函数：格式化彩票数据
+  function formatLottery(name, lotteryData) {
+    let formatted = `${name}\n`;
+    formatted += `1:${lotteryData['1']} 2:${lotteryData['2']} 3:${lotteryData['3']}\n`;
+    if (lotteryData['S'] || lotteryData['C']) {
+      formatted += `S:${lotteryData['S'] || ''}\nC:${lotteryData['C'] || ''}\n`;
+    } else {
+      formatted += `S:\nC:\n`;
+    }
+    formatted += `\n`;
+    return formatted;
+  }
+
+  // Lucky 3:30PM (L3)
+  if (data.L3['1'] || data.L3['2'] || data.L3['3']) {
+    result += formatLottery('Lucky 3:30PM', data.L3);
+  }
+
+  // Lucky 7:30PM (L)
+  if (data.L['1'] || data.L['2'] || data.L['3']) {
+    result += formatLottery('Lucky 7:30PM', data.L);
+  }
+
+  // Perdana 3:30PM (N3)
+  if (data.N3['1'] || data.N3['2'] || data.N3['3']) {
+    result += formatLottery('PERDANA 3:30PM', data.N3);
+  }
+
+  // Perdana 7:30PM (N)
+  if (data.N['1'] || data.N['2'] || data.N['3']) {
+    result += formatLottery('PERDANA 7:30PM', data.N);
+  }
+
+  return result;
+}
+
+// 初始化定时自动抓取
+function initAutoFetchSchedule() {
+  // 每分钟检查一次是否到达 4pm 或 8pm（下午场/晚间场各自独立，每天各抓一次）
+  setInterval(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+
+    const slot = (hour === 16 && minute < 5) ? '16'
+               : (hour === 20 && minute < 5) ? '20'
+               : null;
+    if (!slot) return;
+
+    const todayStr = now.toISOString().split('T')[0];
+    // 只在成功后（autoFetchLottery 内部）才写入日期，失败可在窗口内重试
+    if (localStorage.getItem('lastAutoFetch_' + slot) !== todayStr) {
+      autoFetchLottery(slot);
+    }
+  }, 60000); // 每 60 秒检查一次
+}
+
+// Init
+updateLotteryStatus();
+initAutoFetchSchedule();
+loadApiKey();
+</script>
+</body>
+</html>
