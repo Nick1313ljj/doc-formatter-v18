@@ -139,7 +139,9 @@
 </div>
 
 <!-- API Key (only shown for Format 1) -->
-<div class="api-section" id="apiSection">
+<button id="apiToggle" class="hbtn" onclick="toggleApiSection()"
+  style="margin-bottom:8px;width:100%;text-align:left;padding:8px 12px">⚙ AI 引擎设置 ▶</button>
+<div class="api-section" id="apiSection" style="display:none">
   <!-- Engine selector -->
   <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
     <button id="engine42model" class="hbtn" onclick="selectEngine('42model')"
@@ -546,6 +548,14 @@ function updateDefaultLabel() {
   const saved = localStorage.getItem('defaultEngine');
   const el = document.getElementById('defaultEngineLabel');
   if (el) el.textContent = saved ? '此设备默认：' + engineName(saved) : '';
+}
+
+function toggleApiSection() {
+  const s = document.getElementById('apiSection');
+  const btn = document.getElementById('apiToggle');
+  const open = s.style.display !== 'none';
+  s.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '⚙ AI 引擎设置 ▶' : '⚙ AI 引擎设置 ▼';
 }
 
 function toggleApiVis(id, btn) {
