@@ -945,8 +945,20 @@ function processFormat1(raw) {
   // Normalize separators and commas
   let text = raw.replace(/，/g, ',').replace(/…/g, ' ').replace(/\.\.\./g, ' ');
 
-  // Split into space/comma-separated tokens
-  const tokens = text.split(/[\s,]+/).filter(Boolean);
+  // Split into space/comma-separated tokens.
+  // A trailing suffix glued onto a number ("1421rm3A2", "5397-1mkt") is split
+  // into two tokens so the tail goes through the normal company/investment
+  // detection below. Tokens that are themselves a valid investment notation
+  // ("2256B") are left intact.
+  const tokens = [];
+  for (const tok of text.split(/[\s,]+/).filter(Boolean)) {
+    const glued = tok.match(/^(\d{4}(?:[#-]\d+)*)([a-zA-Z].*)$/);
+    if (glued && !/^(rm|sgd)?[\d.]+[bsa]\d*$/i.test(tok)) {
+      tokens.push(glued[1], glued[2]);
+    } else {
+      tokens.push(tok);
+    }
+  }
 
   // Find company code letters and investment token
   let companyLetters = '';
@@ -1783,13 +1795,35 @@ async function printOutput(outputId) {
       '49535343-8841-43f4-a8d4-ecbe34729bb3',
     ];
 
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: PRINTER_SERVICES
-    });
+    let device;
+    let _usedKnown = false;
+    if (typeof navigator.bluetooth.getDevices === 'function') {
+      const _known = await navigator.bluetooth.getDevices();
+      if (_known.length > 0) { device = _known[0]; _usedKnown = true; showToast('正在连接上次的打印机...'); }
+    }
+    if (!device) {
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: PRINTER_SERVICES
+      });
+    }
 
     showToast('连接中...');
-    const server = await device.gatt.connect();
+    let server;
+    try {
+      server = await device.gatt.connect();
+    } catch (_connErr) {
+      if (_usedKnown) {
+        showToast('上次的打印机不可用，请重新选择...');
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: PRINTER_SERVICES
+        });
+        server = await device.gatt.connect();
+      } else {
+        throw _connErr;
+      }
+    }
 
     let writeChar = null;
     for (const svcUUID of PRINTER_SERVICES) {
