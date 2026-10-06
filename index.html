@@ -2249,9 +2249,10 @@ function updateLotteryStatus() {
     return sum + counts;
   }, 0);
 
-  const dates = db.map(e => e.date).join(', ') || '无';
+  const allDates = db.map(e => e.date).filter(Boolean);
+  const latestDate = allDates.length ? allDates.reduce((a, b) => a > b ? a : b) : '无';
   document.getElementById('lotteryLibStatus').innerHTML =
-    `号码库状态：共 ${db.length} 期，${total} 个号码 | 日期：${dates}`;
+    `号码库状态：共 ${db.length} 期，${total} 个号码 | 最新日期：${latestDate}`;
 }
 
 // 解析开彩号码文本
