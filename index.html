@@ -401,12 +401,11 @@
 <div class="panel" id="panel7">
   <div class="section">
     <div class="sec-label">号码库管理</div>
-    <textarea id="input7LotteryRaw" placeholder="粘贴开彩号码（复制自网站或来源）..." style="min-height:120px"></textarea>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-go" onclick="pasteTo('input7LotteryRaw')" style="background:var(--blue)">📋 粘贴</button>
+    <textarea id="input7LotteryRaw" style="display:none"></textarea>
+    <div class="btn-row" style="margin-top:10px;align-items:center">
+      <button class="btn btn-go" onclick="pasteAndAddLottery()" style="background:var(--blue)">📋 粘贴</button>
+      <span id="lotteryPasteDot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d1d5db;flex-shrink:0"></span>
       <button class="btn btn-go" onclick="autoFetchLottery()" style="background:#f59e0b" id="autoFetchBtn">🔄 自动抓取</button>
-      <button class="btn btn-go" onclick="addLotteryToLib()" style="background:var(--accent)">➕ 添加到库</button>
-      <button class="hbtn" onclick="document.getElementById('input7LotteryRaw').value=''">✕ 清空</button>
       <button class="hbtn" onclick="toggleLotteryHistory()" style="border-color:#9333ea;color:#9333ea">🔍 历史号码</button>
       <button class="hbtn" onclick="exportLotteryData()" style="border-color:#2563eb;color:#2563eb">⬇ 导出</button>
       <label class="hbtn" style="border-color:#2563eb;color:#2563eb;cursor:pointer">⬆ 导入<input type="file" accept=".json" style="display:none" onchange="importLotteryData(this)"></label>
@@ -2528,6 +2527,24 @@ function mergeLotteryEntry(parsed) {
 }
 
 // 添加开彩号码到库
+async function pasteAndAddLottery() {
+  const dot = document.getElementById('lotteryPasteDot');
+  let text;
+  try {
+    text = (await navigator.clipboard.readText()).trim();
+  } catch(e) {
+    dot.style.background = '#ef4444';
+    showToast('无法读取剪贴板');
+    return;
+  }
+  if (!text) { dot.style.background = '#ef4444'; showToast('剪贴板为空'); return; }
+  document.getElementById('input7LotteryRaw').value = text;
+  await addLotteryToLib();
+  // addLotteryToLib clears textarea on success; empty = success
+  dot.style.background = document.getElementById('input7LotteryRaw').value === ''
+    ? 'var(--accent)' : '#ef4444';
+}
+
 async function addLotteryToLib() {
   const text = document.getElementById('input7LotteryRaw').value.trim();
   if (!text) { showToast('请粘贴开彩号码'); return; }
